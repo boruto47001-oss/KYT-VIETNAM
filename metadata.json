@@ -1,0 +1,6 @@
+{
+  "name": "KYT Vietnam — Hệ Thống Cửa Hàng Chính Hãng",
+  "description": "Tra cứu hệ thống cửa hàng và đại lý phân phối nón bảo hiểm KYT chính hãng trên toàn quốc. Giao diện tối giản chuẩn Apple Retail.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
