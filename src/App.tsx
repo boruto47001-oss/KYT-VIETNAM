@@ -20,6 +20,7 @@ import {
   INITIAL_STORE_LOCATIONS,
   OFFICIAL_ONLINE_CHANNELS,
   StoreLocation,
+  Language,
   getStoreMapsUrl,
 } from './data/kytData';
 import { KytBrandLogo, ShopeeOfficialLogo, StoreShowroomVisual } from './components/SmartAssetImage';
@@ -30,6 +31,10 @@ export default function App() {
   const brandConfig = INITIAL_BRAND_CONFIG;
   const helmets = INITIAL_FLAGSHIP_HELMETS;
   const stores = INITIAL_STORE_LOCATIONS;
+
+  // Language State (VIE | ENG)
+  const [lang, setLang] = useState<Language>('VIE');
+  const isEn = lang === 'ENG';
 
   // Hero Flagship Helmet Switcher State (TT-REVO, TTR-JET, TIGER JET)
   const [activeHelmetId, setActiveHelmetId] = useState<string>(helmets[0].id);
@@ -102,7 +107,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#0A0A0A] text-white">
       {/* 1. TOP BAR CONTRACT (Minimalist Set.Space / Apple Header) */}
       <header className="sticky top-0 z-40 bg-[#0A0A0A]/90 backdrop-blur-md border-b border-white/[0.08]">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4 sm:gap-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3 sm:gap-8">
           {/* Zone 1: Official KYT Logo */}
           <a
             href="#"
@@ -118,36 +123,68 @@ export default function App() {
               href="#flagship-hero"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Dòng nón
+              {isEn ? 'Helmets' : 'Dòng nón'}
             </a>
             <a
               href="#store-locator"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Hệ thống cửa hàng
+              {isEn ? 'Store Locator' : 'Hệ thống cửa hàng'}
             </a>
             <a
               href="#online-order"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Đặt hàng Online
+              {isEn ? 'Online Store' : 'Đặt hàng Online'}
             </a>
             <a
               href="#kyt-standards"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Tiêu chuẩn
+              {isEn ? 'Standards' : 'Tiêu chuẩn'}
             </a>
           </nav>
 
-          {/* Zone 3: 1 Primary Action Button */}
-          <div className="flex items-center shrink-0">
+          {/* Zone 3: Primary Action Button + Compact VIE / ENG Language Switcher */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <a
               href="#store-locator"
-              className="px-3.5 sm:px-4 py-2 text-xs font-semibold text-white bg-[#E10600] hover:bg-[#B80500] rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="px-3 sm:px-4 py-2 text-xs font-semibold text-white bg-[#E10600] hover:bg-[#B80500] rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
-              Hệ thống cửa hàng
+              {isEn ? 'Find a Store' : 'Hệ thống cửa hàng'}
             </a>
+
+            {/* Compact Language Switcher (VIE | ENG) at Top-Right Corner */}
+            <div
+              role="group"
+              aria-label="Language selector"
+              className="inline-flex items-center p-0.5 rounded-lg bg-white/[0.06] border border-white/15 text-[10px] sm:text-[11px] font-mono font-bold tracking-wider select-none shrink-0"
+            >
+              <button
+                type="button"
+                onClick={() => setLang('VIE')}
+                aria-pressed={lang === 'VIE'}
+                className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                  lang === 'VIE'
+                    ? 'bg-[#E10600] text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                VIE
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('ENG')}
+                aria-pressed={lang === 'ENG'}
+                className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                  lang === 'ENG'
+                    ? 'bg-[#E10600] text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                ENG
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -172,9 +209,11 @@ export default function App() {
 
             {/* Ultra-Clean Set.Space Centered Headline */}
             <h1 className="w-full max-w-5xl text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold uppercase tracking-wide leading-tight">
-              <span className="block">TÌM KIẾM GIẢI PHÁP MUA HÀNG</span>
+              <span className="block">
+                {isEn ? 'FIND YOUR OPTIMAL' : 'TÌM KIẾM GIẢI PHÁP MUA HÀNG'}
+              </span>
               <span className="block mt-2.5 sm:mt-4 md:mt-5 text-[#FF1E1A] drop-shadow-[0_0_24px_rgba(255,30,26,0.65)] font-extrabold">
-                TỐI ƯU, CHÍNH HÃNG
+                {isEn ? 'AUTHENTIC KYT HELMET' : 'TỐI ƯU, CHÍNH HÃNG'}
               </span>
             </h1>
 
@@ -184,7 +223,7 @@ export default function App() {
                 href="#store-locator"
                 className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#E10600] hover:bg-[#B80500] rounded-xl transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
               >
-                <span>Hệ thống cửa hàng</span>
+                <span>{isEn ? 'Authorized Dealers' : 'Hệ thống cửa hàng'}</span>
                 <ArrowDown className="w-4 h-4" />
               </a>
               <a
@@ -192,7 +231,7 @@ export default function App() {
                 className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 rounded-xl transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
               >
                 <ShoppingBag className="w-4 h-4 text-[#E10600]" />
-                <span>Đặt hàng Online</span>
+                <span>{isEn ? 'Shop Online' : 'Đặt hàng Online'}</span>
               </a>
             </div>
 
@@ -202,6 +241,7 @@ export default function App() {
                 helmets={helmets}
                 activeHelmetId={activeHelmetId}
                 onSelectHelmet={setActiveHelmetId}
+                lang={lang}
               />
             </div>
           </div>
@@ -219,7 +259,7 @@ export default function App() {
                   <span>KYT OFFICIAL STORE NETWORK</span>
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0A0A0A] text-balance">
-                  Hệ thống cửa hàng
+                  {isEn ? 'Authorized Dealer Network' : 'Hệ thống cửa hàng'}
                 </h2>
               </div>
             </div>
@@ -233,7 +273,7 @@ export default function App() {
                     htmlFor="province-select"
                     className="block text-xs font-semibold text-[#1D1D1F] mb-1.5"
                   >
-                    Tỉnh / Thành phố
+                    {isEn ? 'Province / City' : 'Tỉnh / Thành phố'}
                   </label>
                   <select
                     id="province-select"
@@ -242,7 +282,9 @@ export default function App() {
                     className="w-full h-11 px-3.5 text-sm font-medium bg-white text-[#0A0A0A] border border-neutral-300 rounded-xl focus:outline-none focus:border-[#E10600] transition-colors cursor-pointer"
                   >
                     <option value="ALL">
-                      Tất cả Tỉnh / Thành phố ({stores.length})
+                      {isEn
+                        ? `All Provinces / Cities (${stores.length})`
+                        : `Tất cả Tỉnh / Thành phố (${stores.length})`}
                     </option>
                     {provincesWithCounts.map(({ province, count }) => (
                       <option key={province} value={province}>
@@ -258,7 +300,7 @@ export default function App() {
                     htmlFor="district-select"
                     className="block text-xs font-semibold text-[#1D1D1F] mb-1.5"
                   >
-                    Quận / Huyện / Thành phố
+                    {isEn ? 'District / Area' : 'Quận / Huyện / Thành phố'}
                   </label>
                   <select
                     id="district-select"
@@ -268,8 +310,12 @@ export default function App() {
                   >
                     <option value="ALL">
                       {selectedProvince === 'ALL'
-                        ? `Tất cả Quận / Huyện (${availableDistricts.length})`
-                        : `Tất cả khu vực tại ${selectedProvince}`}
+                        ? isEn
+                          ? `All Districts / Areas (${availableDistricts.length})`
+                          : `Tất cả Quận / Huyện (${availableDistricts.length})`
+                        : isEn
+                          ? `All areas in ${selectedProvince}`
+                          : `Tất cả khu vực tại ${selectedProvince}`}
                     </option>
                     {availableDistricts.map(({ district, count }) => (
                       <option key={district} value={district}>
@@ -285,7 +331,9 @@ export default function App() {
                     htmlFor="store-search"
                     className="block text-xs font-semibold text-[#1D1D1F] mb-1.5"
                   >
-                    Tìm nhanh tên cửa hàng hoặc tên đường
+                    {isEn
+                      ? 'Quick search by dealer name or street'
+                      : 'Tìm nhanh tên cửa hàng hoặc tên đường'}
                   </label>
                   <div className="relative">
                     <Search className="w-4 h-4 text-[#6E6E73] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -294,7 +342,11 @@ export default function App() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="VD: Hiếu KYT, Nguyễn Thị Minh Khai..."
+                      placeholder={
+                        isEn
+                          ? 'e.g. Tai Dat, Hieu KYT, Nguyen Oanh...'
+                          : 'VD: Hiếu KYT, Nguyễn Thị Minh Khai...'
+                      }
                       className="w-full h-11 pl-10 pr-4 text-sm font-medium bg-white text-[#0A0A0A] border border-neutral-300 rounded-xl focus:outline-none focus:border-[#E10600] transition-colors"
                     />
                   </div>
@@ -312,7 +364,7 @@ export default function App() {
                         : 'bg-white text-[#1D1D1F] border border-neutral-200 hover:border-neutral-400'
                     }`}
                   >
-                    Toàn quốc ({stores.length})
+                    {isEn ? `Nationwide (${stores.length})` : `Toàn quốc (${stores.length})`}
                   </button>
                   {provincesWithCounts.map(({ province, count }) => {
                     const active = selectedProvince === province;
@@ -334,11 +386,11 @@ export default function App() {
 
                 <div className="flex items-center justify-between sm:justify-end gap-4 text-xs shrink-0">
                   <span className="text-[#6E6E73] font-medium">
-                    Hiển thị{' '}
+                    {isEn ? 'Showing ' : 'Hiển thị '}
                     <strong className="font-mono tabular-nums text-[#0A0A0A]">
                       {filteredStores.length}
                     </strong>{' '}
-                    cửa hàng
+                    {isEn ? 'dealers' : 'cửa hàng'}
                   </span>
 
                   {(selectedProvince !== 'ALL' ||
@@ -349,7 +401,7 @@ export default function App() {
                       className="text-xs font-semibold text-[#E10600] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Đặt lại</span>
+                      <span>{isEn ? 'Reset' : 'Đặt lại'}</span>
                     </button>
                   )}
                 </div>
@@ -396,7 +448,11 @@ export default function App() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          title={`Chỉ đường trực tiếp đến: ${store.address}`}
+                          title={
+                            isEn
+                              ? `Direct Google Maps directions to: ${store.address}`
+                              : `Chỉ đường trực tiếp đến: ${store.address}`
+                          }
                           className="text-sm text-[#1D1D1F] hover:text-[#E10600] hover:underline leading-relaxed flex items-start gap-2 pt-0.5 transition-colors"
                         >
                           <MapPin className="w-4 h-4 text-[#E10600] shrink-0 mt-0.5" />
@@ -413,18 +469,22 @@ export default function App() {
                             href={getStoreMapsUrl(store.address)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`Chỉ đường trực tiếp trên Google Maps: ${store.address}`}
+                            title={
+                              isEn
+                                ? `Direct Google Maps navigation: ${store.address}`
+                                : `Chỉ đường trực tiếp trên Google Maps: ${store.address}`
+                            }
                             className="flex-1 py-2.5 px-4 text-xs font-semibold text-white bg-[#0A0A0A] hover:bg-[#E10600] rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 min-h-[40px]"
                           >
                             <Navigation className="w-3.5 h-3.5" />
-                            <span>Chỉ đường</span>
+                            <span>{isEn ? 'Directions' : 'Chỉ đường'}</span>
                           </a>
 
                           <button
                             onClick={() => setActiveStoreModal(store)}
                             className="py-2.5 px-3.5 text-xs font-semibold text-[#1D1D1F] bg-[#F5F5F7] hover:bg-neutral-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 min-h-[40px]"
                           >
-                            <span>Chi tiết</span>
+                            <span>{isEn ? 'Details' : 'Chi tiết'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -438,17 +498,19 @@ export default function App() {
                 <MapPin className="w-8 h-8 text-[#E10600] mx-auto" />
                 <div className="space-y-1">
                   <h3 className="text-base sm:text-lg font-bold text-[#0A0A0A]">
-                    Không tìm thấy cửa hàng phù hợp
+                    {isEn ? 'No matching dealers found' : 'Không tìm thấy cửa hàng phù hợp'}
                   </h3>
                   <p className="text-xs sm:text-sm text-[#6E6E73]">
-                    Vui lòng chọn Tỉnh/Thành phố khác hoặc đặt lại bộ lọc.
+                    {isEn
+                      ? 'Please select another Province/City or reset the filters.'
+                      : 'Vui lòng chọn Tỉnh/Thành phố khác hoặc đặt lại bộ lọc.'}
                   </p>
                 </div>
                 <button
                   onClick={handleResetFilters}
                   className="px-5 py-2.5 text-xs font-semibold text-white bg-[#0A0A0A] hover:bg-[#E10600] rounded-lg transition-colors cursor-pointer"
                 >
-                  Xem tất cả cửa hàng
+                  {isEn ? 'View all dealers' : 'Xem tất cả cửa hàng'}
                 </button>
               </div>
             )}
@@ -469,11 +531,13 @@ export default function App() {
                   <span>OFFICIAL E-COMMERCE</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white text-balance">
-                  Đặt hàng Online chính hãng
+                  {isEn ? 'Official Online Stores' : 'Đặt hàng Online chính hãng'}
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-neutral-400 max-w-md leading-relaxed">
-                Mua sắm trực tiếp tại gian hàng chính thức của KYT Vietnam trên Shopee và TikTok Shop.
+                {isEn
+                  ? 'Shop directly at KYT Vietnam official flagship stores on Shopee and TikTok Shop.'
+                  : 'Mua sắm trực tiếp tại gian hàng chính thức của KYT Vietnam trên Shopee và TikTok Shop.'}
               </p>
             </div>
 
@@ -532,14 +596,14 @@ export default function App() {
                             : 'bg-white text-[#0A0A0A] group-hover:bg-neutral-200'
                         }`}
                       >
-                        <span>Mua ngay</span>
+                        <span>{isEn ? 'Shop Now' : 'Mua ngay'}</span>
                         <ExternalLink className="w-3.5 h-3.5" />
                       </span>
                     </div>
 
                     <div className="space-y-2 pt-3 border-t border-white/[0.08]">
                       <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                        {channel.description}
+                        {isEn ? channel.descriptionEn : channel.description}
                       </p>
                       <p className="text-xs font-mono text-neutral-500 truncate">
                         {channel.handle}
@@ -562,35 +626,43 @@ export default function App() {
                 <span>AUTHENTIC KYT STANDARD</span>
               </div>
               <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white text-balance">
-                An tâm tuyệt đối tại mọi điểm bán chính hãng.
+                {isEn
+                  ? 'Complete peace of mind at every authorized dealer.'
+                  : 'An tâm tuyệt đối tại mọi điểm bán chính hãng.'}
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 pt-4 border-t border-white/10">
               <div className="space-y-1.5">
                 <h3 className="text-xs font-mono uppercase tracking-wider text-[#E10600] font-semibold">
-                  CHÍNH HÃNG 100%
+                  {isEn ? '100% AUTHENTIC' : 'CHÍNH HÃNG 100%'}
                 </h3>
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Đầy đủ tem kiểm định chất lượng và nguồn gốc phân phối chính thức.
+                  {isEn
+                    ? 'Complete with official safety certification stamps and verified distribution origin.'
+                    : 'Đầy đủ tem kiểm định chất lượng và nguồn gốc phân phối chính thức.'}
                 </p>
               </div>
 
               <div className="space-y-1.5">
                 <h3 className="text-xs font-mono uppercase tracking-wider text-[#E10600] font-semibold">
-                  ĐỘI THỬ TRỰC TIẾP
+                  {isEn ? 'IN-STORE FITTING' : 'ĐỘI THỬ TRỰC TIẾP'}
                 </h3>
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Đo vòng đầu và thử trực tiếp các size M, L, XL, 2XL ngay tại cửa hàng.
+                  {isEn
+                    ? 'Measure your head circumference and try sizes M, L, XL, 2XL in person at the store.'
+                    : 'Đo vòng đầu và thử trực tiếp các size M, L, XL, 2XL ngay tại cửa hàng.'}
                 </p>
               </div>
 
               <div className="space-y-1.5">
                 <h3 className="text-xs font-mono uppercase tracking-wider text-[#E10600] font-semibold">
-                  PHỤ KIỆN ĐỒNG BỘ
+                  {isEn ? 'GENUINE ACCESSORIES' : 'PHỤ KIỆN ĐỒNG BỘ'}
                 </h3>
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Sẵn có kính chắn Clear, Dark Smoke, Iridium, Pinlock và lót thay thế.
+                  {isEn
+                    ? 'Full availability of Clear, Dark Smoke, Iridium visors, Pinlock lenses, and replacement liners.'
+                    : 'Sẵn có kính chắn Clear, Dark Smoke, Iridium, Pinlock và lót thay thế.'}
                 </p>
               </div>
             </div>
@@ -606,20 +678,22 @@ export default function App() {
             <div className="space-y-0.5">
               <p className="text-xs font-bold text-white tracking-wide">{brandConfig.brandName}</p>
               <p className="text-xs text-neutral-500">
-                Hệ thống cửa hàng phân phối chính hãng trên toàn quốc
+                {isEn
+                  ? 'Official authorized distribution network nationwide'
+                  : 'Hệ thống cửa hàng phân phối chính hãng trên toàn quốc'}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs text-neutral-400">
             <a href="#flagship-hero" className="hover:text-white transition-colors">
-              Dòng nón
+              {isEn ? 'Helmets' : 'Dòng nón'}
             </a>
             <a href="#store-locator" className="hover:text-white transition-colors">
-              Hệ thống cửa hàng
+              {isEn ? 'Store Locator' : 'Hệ thống cửa hàng'}
             </a>
             <a href="#online-order" className="hover:text-white transition-colors">
-              Đặt hàng Online
+              {isEn ? 'Online Store' : 'Đặt hàng Online'}
             </a>
             <a
               href="https://shopee.vn/kytvietnam?entryPoint=ShopBySearch&searchKeyword=kyt"
@@ -645,6 +719,7 @@ export default function App() {
       <StoreDetailModal
         store={activeStoreModal}
         onClose={() => setActiveStoreModal(null)}
+        lang={lang}
       />
     </div>
   );

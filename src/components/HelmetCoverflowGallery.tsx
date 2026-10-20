@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
-import { HelmetShowcase } from '../data/kytData';
+import { HelmetShowcase, Language } from '../data/kytData';
 
 interface HelmetCoverflowGalleryProps {
   helmets: HelmetShowcase[];
   activeHelmetId: string;
   onSelectHelmet: (id: string) => void;
+  lang?: Language;
 }
 
 /**
@@ -44,7 +45,9 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
   helmets,
   activeHelmetId,
   onSelectHelmet,
+  lang = 'VIE',
 }) => {
+  const isEn = lang === 'ENG';
   const activeHelmet = helmets.find((h) => h.id === activeHelmetId) || helmets[0];
   const slides = activeHelmet.slides;
 
@@ -292,7 +295,7 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
                       {isCenter ? (
                         <span className="inline-flex items-center gap-1 text-[#E10600] font-semibold">
                           <Maximize2 className="w-3 h-3" />
-                          <span className="hidden sm:inline">Chi tiết</span>
+                          <span className="hidden sm:inline">{isEn ? 'Details' : 'Chi tiết'}</span>
                         </span>
                       ) : (
                         <span>0{index + 1}</span>
@@ -357,7 +360,9 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
                 {/* .strip Thumbnail Strip */}
                 <div className="space-y-2">
                   <p className="text-[11px] font-mono uppercase tracking-wider text-neutral-400">
-                    CHỌN HÌNH TRONG BỘ 5 ẢNH ({activeIndex + 1}/{slides.length})
+                    {isEn
+                      ? `SELECT PHOTO IN 5-IMAGE SET (${activeIndex + 1}/${slides.length})`
+                      : `CHỌN HÌNH TRONG BỘ 5 ẢNH (${activeIndex + 1}/${slides.length})`}
                   </p>
                   <div className="flex items-center gap-2.5 overflow-x-auto py-1.5 px-1">
                     {slides.map((slide, idx) => {
@@ -387,7 +392,7 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-mono uppercase tracking-wider text-[#E10600]">
-                      {currentSlide.sku} · {activeHelmet.series}
+                      {currentSlide.sku} · {isEn ? activeHelmet.seriesEn : activeHelmet.series}
                     </p>
                     <h3 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mt-0.5">
                       {currentSlide.title}
@@ -396,20 +401,34 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
 
                   <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 pt-3 border-t border-white/20 text-xs font-mono">
                     <div>
-                      <dt className="text-neutral-400 uppercase">CHỨNG NHẬN</dt>
-                      <dd className="text-white font-semibold mt-0.5">{activeHelmet.certification}</dd>
+                      <dt className="text-neutral-400 uppercase">
+                        {isEn ? 'CERTIFICATION' : 'CHỨNG NHẬN'}
+                      </dt>
+                      <dd className="text-white font-semibold mt-0.5">
+                        {isEn ? activeHelmet.certificationEn : activeHelmet.certification}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-neutral-400 uppercase">TRỌNG LƯỢNG</dt>
+                      <dt className="text-neutral-400 uppercase">
+                        {isEn ? 'WEIGHT' : 'TRỌNG LƯỢNG'}
+                      </dt>
                       <dd className="text-white font-semibold mt-0.5">{activeHelmet.weight}</dd>
                     </div>
                     <div>
-                      <dt className="text-neutral-400 uppercase">CẤU TRÚC VỎ</dt>
-                      <dd className="text-white font-semibold mt-0.5">{activeHelmet.shellMaterial}</dd>
+                      <dt className="text-neutral-400 uppercase">
+                        {isEn ? 'SHELL MATERIAL' : 'CẤU TRÚC VỎ'}
+                      </dt>
+                      <dd className="text-white font-semibold mt-0.5">
+                        {isEn ? activeHelmet.shellMaterialEn : activeHelmet.shellMaterial}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-neutral-400 uppercase">HỆ KÍNH</dt>
-                      <dd className="text-white font-semibold mt-0.5">{activeHelmet.visorSpec}</dd>
+                      <dt className="text-neutral-400 uppercase">
+                        {isEn ? 'VISOR SYSTEM' : 'HỆ KÍNH'}
+                      </dt>
+                      <dd className="text-white font-semibold mt-0.5">
+                        {isEn ? activeHelmet.visorSpecEn : activeHelmet.visorSpec}
+                      </dd>
                     </div>
                   </dl>
 
@@ -420,7 +439,7 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
                       className="px-5 py-2 text-xs font-mono uppercase tracking-wider text-white border border-white/80 hover:bg-white hover:text-black rounded-full transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Đóng chi tiết</span>
+                      <span>{isEn ? 'Close details' : 'Đóng chi tiết'}</span>
                     </button>
                   </div>
                 </div>
@@ -438,7 +457,7 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
             {activeHelmet.shortName}
           </h2>
           <span className="text-xs font-mono uppercase tracking-wider text-[#E10600]">
-            {activeHelmet.series}
+            {isEn ? activeHelmet.seriesEn : activeHelmet.series}
           </span>
         </div>
 
@@ -477,7 +496,7 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
             onClick={handleNext}
             className="px-3.5 py-2 rounded-lg bg-[#E10600] hover:bg-[#B80500] text-white font-sans font-semibold text-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <span>Xem tiếp</span>
+            <span>{isEn ? 'Next' : 'Xem tiếp'}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>

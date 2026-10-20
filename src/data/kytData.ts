@@ -1,3 +1,5 @@
+export type Language = 'VIE' | 'ENG';
+
 export interface HelmetGallerySlide {
   id: string;
   sku: string;
@@ -11,11 +13,15 @@ export interface HelmetShowcase {
   name: string;
   shortName: string;
   series: string;
+  seriesEn: string;
   tagline: string;
   weight: string;
   certification: string;
+  certificationEn: string;
   shellMaterial: string;
+  shellMaterialEn: string;
   visorSpec: string;
+  visorSpecEn: string;
   slides: HelmetGallerySlide[];
 }
 
@@ -48,11 +54,15 @@ export const INITIAL_FLAGSHIP_HELMETS: HelmetShowcase[] = [
     name: 'KYT TT-REVO',
     shortName: 'TT-REVO',
     series: 'Full-Face Aerodynamic Sport',
+    seriesEn: 'Full-Face Aerodynamic Sport',
     tagline: 'Thiết kế khí động học hầm gió thế hệ mới.',
     weight: '1,450g ± 50g',
     certification: 'ECE 22.06 · QCVN',
+    certificationEn: 'ECE 22.06 · QCVN Certified',
     shellMaterial: 'ADT-Advanced Thermoplastic (3 cỡ vỏ)',
+    shellMaterialEn: 'ADT-Advanced Thermoplastic (3 Shell Sizes)',
     visorSpec: 'Optical Class 1 · Pinlock Max Vision',
+    visorSpecEn: 'Optical Class 1 · Pinlock Max Vision',
     slides: [
       {
         id: 'tt-revo-01',
@@ -96,11 +106,15 @@ export const INITIAL_FLAGSHIP_HELMETS: HelmetShowcase[] = [
     name: 'KYT TTR-JET',
     shortName: 'TTR-JET',
     series: 'Aerodynamic Open-Face 2 Kính',
+    seriesEn: 'Aerodynamic Dual-Visor Open-Face',
     tagline: 'Nón 3/4 hai kính phát triển từ hầm gió khí động học.',
     weight: '1,400g ± 50g',
     certification: 'ECE 22.06 · QCVN',
+    certificationEn: 'ECE 22.06 · QCVN Certified',
     shellMaterial: 'ADT-Advanced Thermoplastic',
+    shellMaterialEn: 'ADT-Advanced Thermoplastic',
     visorSpec: 'Dual Visor · Kính âm chống nắng UV380',
+    visorSpecEn: 'Dual Visor · UV380 Inner Sun Visor',
     slides: [
       {
         id: 'ttr-jet-01',
@@ -144,11 +158,15 @@ export const INITIAL_FLAGSHIP_HELMETS: HelmetShowcase[] = [
     name: 'KYT TIGER JET',
     shortName: 'TIGER JET',
     series: 'Nón 1/2 Trùm Tai Có Kính',
+    seriesEn: 'Urban Half-Face Helmet with Visor',
     tagline: 'Nón bảo hiểm 1/2 siêu nhẹ 700g, gọn gàng và linh hoạt tối đa cho đô thị.',
     weight: '700g',
     certification: 'QCVN · Chuẩn an toàn Việt Nam',
+    certificationEn: 'QCVN · Vietnam Safety Standard',
     shellMaterial: 'ABS Nguyên Sinh Chịu Lực Cao',
+    shellMaterialEn: 'High-Impact Virgin ABS Shell',
     visorSpec: 'Kính chắn gió trong suốt · Lọc UV380',
+    visorSpecEn: 'Clear Anti-Scratch Visor · UV380 Filter',
     slides: [
       {
         id: 'tiger-jet-01',
@@ -194,6 +212,7 @@ export interface OnlineChannel {
   name: string;
   handle: string;
   description: string;
+  descriptionEn: string;
   url: string;
   badge: string;
 }
@@ -204,6 +223,7 @@ export const OFFICIAL_ONLINE_CHANNELS: OnlineChannel[] = [
     name: 'Shopee',
     handle: 'shopee.vn/kytvietnam',
     description: 'Gian hàng trực tuyến chính hãng KYT Vietnam trên Shopee với đầy đủ các dòng nón và phụ kiện.',
+    descriptionEn: 'KYT Vietnam official flagship store on Shopee with full range of helmets and genuine accessories.',
     url: 'https://shopee.vn/kytvietnam?entryPoint=ShopBySearch&searchKeyword=kyt',
     badge: 'OFFICIAL SHOPEE STORE',
   },
@@ -212,6 +232,7 @@ export const OFFICIAL_ONLINE_CHANNELS: OnlineChannel[] = [
     name: 'TikTok Shop',
     handle: 'KYT Vietnam TikTok Shop',
     description: 'Đặt hàng nhanh qua TikTok Shop chính thức của KYT Vietnam cùng các ưu đãi vận chuyển.',
+    descriptionEn: 'Fast ordering via KYT Vietnam official TikTok Shop with exclusive shipping vouchers.',
     url: 'https://vt.tiktok.com/ZSghUua4x/?page=TikTokShop',
     badge: 'OFFICIAL TIKTOK SHOP',
   },

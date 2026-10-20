@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
 import { X, MapPin, Navigation, Copy, Check, ShieldCheck } from 'lucide-react';
-import { StoreLocation, getStoreMapsUrl } from '../data/kytData';
+import { StoreLocation, Language, getStoreMapsUrl } from '../data/kytData';
 import { StoreShowroomVisual } from './SmartAssetImage';
 
 interface StoreDetailModalProps {
   store: StoreLocation | null;
   onClose: () => void;
+  lang?: Language;
 }
 
-export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClose }) => {
+const translateProductLine = (line: string, isEn: boolean): string => {
+  if (!isEn) return line;
+  return line
+    .replace('Áo mưa & Phụ kiện KYT', 'KYT Rainwear & Accessories')
+    .replace('Phụ kiện & Kính KYT', 'KYT Visors & Accessories')
+    .replace('Phụ kiện KYT', 'KYT Accessories')
+    .replace('Áo mưa KYT', 'KYT Rainwear');
+};
+
+export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
+  store,
+  onClose,
+  lang = 'VIE',
+}) => {
   const [copied, setCopied] = useState(false);
+  const isEn = lang === 'ENG';
 
   if (!store) return null;
 
@@ -41,7 +56,7 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
           />
           <button
             onClick={onClose}
-            aria-label="Đóng cửa sổ"
+            aria-label={isEn ? 'Close modal' : 'Đóng cửa sổ'}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/75 text-white hover:bg-[#E10600] transition-colors flex items-center justify-center cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -66,7 +81,11 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
           <div className="py-5 border-y border-neutral-200 space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-[#6E6E73]">
               <MapPin className="w-4 h-4 text-[#E10600] shrink-0" />
-              <span>Địa chỉ cửa hàng (Bấm để mở bản đồ)</span>
+              <span>
+                {isEn
+                  ? 'Store Address (Click for direct Google Maps navigation)'
+                  : 'Địa chỉ cửa hàng (Bấm để mở bản đồ)'}
+              </span>
             </div>
             <a
               href={getStoreMapsUrl(store.address)}
@@ -82,10 +101,14 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[#6E6E73] mb-2.5 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#E10600]" />
-              <span>Các dòng sản phẩm KYT phân phối tại điểm bán</span>
+              <span>
+                {isEn
+                  ? 'Authorized KYT Product Lines Available'
+                  : 'Các dòng sản phẩm KYT phân phối tại điểm bán'}
+              </span>
             </h4>
             <p className="text-sm text-[#1D1D1F] leading-relaxed">
-              {store.availableLines.join(' · ')}
+              {store.availableLines.map((line) => translateProductLine(line, isEn)).join(' · ')}
             </p>
           </div>
 
@@ -98,12 +121,12 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-[#E10600]" />
-                  <span>Đã sao chép địa chỉ</span>
+                  <span>{isEn ? 'Address Copied' : 'Đã sao chép địa chỉ'}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4" />
-                  <span>Sao chép địa chỉ</span>
+                  <span>{isEn ? 'Copy Address' : 'Sao chép địa chỉ'}</span>
                 </>
               )}
             </button>
@@ -115,7 +138,7 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
               className="px-5 py-2.5 text-xs font-semibold text-white bg-[#E10600] hover:bg-[#B80500] rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
             >
               <Navigation className="w-3.5 h-3.5" />
-              <span>Mở chỉ đường Google Maps</span>
+              <span>{isEn ? 'Get Directions on Google Maps' : 'Mở chỉ đường Google Maps'}</span>
             </a>
           </div>
         </div>
