@@ -11,6 +11,7 @@ import {
 import {
   db,
   auth,
+  hasFirestoreDb,
   handleFirestoreError,
   OperationType,
   isAuthorizedAdminUser,
@@ -252,6 +253,7 @@ function dispatchToExternalPixels(event: TrackingEventRecord): void {
  * Syncs a single tracking event to Firebase Firestore if the authorized admin is signed in.
  */
 export async function syncEventToFirestore(event: TrackingEventRecord): Promise<boolean> {
+  if (!hasFirestoreDb) return false;
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser) || !currentUser) {
     return false;
@@ -342,6 +344,7 @@ export function trackKytEvent(params: {
  * Syncs all unsynced local tracking events to Firestore once the admin logs in.
  */
 export async function syncPendingLocalEventsToCloud(): Promise<number> {
+  if (!hasFirestoreDb) return 0;
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser)) return 0;
 
@@ -380,6 +383,9 @@ export async function syncPendingLocalEventsToCloud(): Promise<number> {
 export function subscribeToCloudEvents(
   onUpdate: (events: TrackingEventRecord[]) => void
 ): () => void {
+  if (!hasFirestoreDb) {
+    return () => {};
+  }
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser)) {
     return () => {};
@@ -441,6 +447,10 @@ export async function saveTrackingConfigToCloud(
 
   saveLocalPixelConfig(sanitizedConfig);
 
+  if (!hasFirestoreDb) {
+    return true;
+  }
+
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser) || !currentUser) {
     return false;
@@ -478,6 +488,7 @@ export async function saveTrackingConfigToCloud(
  * Loads the Pixel & GA4 configuration from Firestore if authorized admin is signed in.
  */
 export async function loadTrackingConfigFromCloud(): Promise<TrackingPixelConfig | null> {
+  if (!hasFirestoreDb) return null;
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser)) return null;
 
@@ -506,6 +517,7 @@ export async function loadTrackingConfigFromCloud(): Promise<TrackingPixelConfig
  */
 export async function clearAllTrackingEvents(cloudEvents: TrackingEventRecord[]): Promise<void> {
   saveLocalEvents([]);
+  if (!hasFirestoreDb) return;
   const currentUser = auth.currentUser;
   if (!isAuthorizedAdminUser(currentUser)) return;
 

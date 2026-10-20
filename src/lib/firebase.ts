@@ -12,7 +12,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  getDocFromServer,
   serverTimestamp,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -21,12 +20,13 @@ export const AUTHORIZED_ADMIN_EMAIL = 'boruto47001@gmail.com';
 
 export const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
-const FIRESTORE_DATABASE_ID =
-  (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId ||
-  'ai-studio-kytvietnamhthngc-40395a25-2b98-418a-974b-805c57d71b86';
+export const hasFirestoreDb = Boolean(
+  firebaseConfig.firestoreDatabaseId &&
+    firebaseConfig.firestoreDatabaseId.trim().length > 0
+);
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, FIRESTORE_DATABASE_ID);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
@@ -100,28 +100,15 @@ export function handleFirestoreError(
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore on boot
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-  }
-}
-testConnection();
-
 /**
  * Ensures the authenticated admin account (boruto47001@gmail.com) is registered
- * in the /admins/{uid} collection in Cloud Firestore.
+ * in the /admins/{uid} collection in Cloud Firestore when Firestore is enabled.
  */
 export async function ensureCloudAdminProfile(user: User): Promise<void> {
-  if (!isAuthorizedAdminUser(user)) return;
+  if (!hasFirestoreDb || !isAuthorizedAdminUser(user)) return;
   const cleanUid = user.uid.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
   const adminRef = doc(db, 'admins', cleanUid);
   try {
@@ -133,9 +120,8 @@ export async function ensureCloudAdminProfile(user: User): Promise<void> {
         createdAt: serverTimestamp(),
       });
     }
-  } catch (error) {
-    // Do not block UI if rules or network are still initializing
-    console.warn('Could not verify/create admin doc:', error);
+  } catch {
+    // Ignore if Firestore is not active on this OAuth project
   }
 }
 
@@ -193,9 +179,6 @@ export const googleSignIn = async (): Promise<{
     cachedAccessToken = credential.accessToken;
     await ensureCloudAdminProfile(result.user);
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error) {
-    console.error('Sign in error:', error);
-    throw error;
   } finally {
     isSigningIn = false;
   }
