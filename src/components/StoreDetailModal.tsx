@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, MapPin, Navigation, Copy, Check, ShieldCheck } from 'lucide-react';
 import { StoreLocation, Language, getStoreMapsUrl } from '../data/kytData';
 import { StoreShowroomVisual } from './SmartAssetImage';
+import { trackKytEvent } from '../lib/tracking';
 
 interface StoreDetailModalProps {
   store: StoreLocation | null;
@@ -31,7 +32,24 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(`${store.name} - ${store.address}`);
     setCopied(true);
+    trackKytEvent({
+      eventType: 'store_address_copy',
+      targetId: store.id,
+      targetLabel: store.name,
+      category: store.province,
+      lang,
+    });
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDirectionsClick = () => {
+    trackKytEvent({
+      eventType: 'store_directions_click',
+      targetId: store.id,
+      targetLabel: store.name,
+      category: store.province,
+      lang,
+    });
   };
 
   return (
@@ -91,6 +109,7 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               href={getStoreMapsUrl(store.address)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleDirectionsClick}
               className="block text-base text-[#0A0A0A] hover:text-[#E10600] hover:underline leading-relaxed font-semibold transition-colors"
             >
               {store.address}
@@ -135,6 +154,7 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               href={getStoreMapsUrl(store.address)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleDirectionsClick}
               className="px-5 py-2.5 text-xs font-semibold text-white bg-[#E10600] hover:bg-[#B80500] rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
             >
               <Navigation className="w-3.5 h-3.5" />

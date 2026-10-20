@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   MapPin,
   Navigation,
@@ -13,6 +13,7 @@ import {
   ArrowDown,
   ExternalLink,
   ShoppingBag,
+  BarChart3,
 } from 'lucide-react';
 import {
   INITIAL_BRAND_CONFIG,
@@ -26,6 +27,18 @@ import {
 import { KytBrandLogo, ShopeeOfficialLogo, StoreShowroomVisual } from './components/SmartAssetImage';
 import { HelmetCoverflowGallery } from './components/HelmetCoverflowGallery';
 import { StoreDetailModal } from './components/StoreDetailModal';
+import { TrackingDashboardModal } from './components/TrackingDashboardModal';
+import {
+  trackKytEvent,
+  loadLocalPixelConfig,
+  injectExternalTrackingPixels,
+} from './lib/tracking';
+import {
+  auth,
+  onAuthStateChanged,
+  isAuthorizedAdminUser,
+  User,
+} from './lib/firebase';
 
 export default function App() {
   const brandConfig = INITIAL_BRAND_CONFIG;
@@ -46,6 +59,85 @@ export default function App() {
 
   // Store Detail Modal State
   const [activeStoreModal, setActiveStoreModal] = useState<StoreLocation | null>(null);
+
+  // Stealth Tracking & Analytics Studio Modal State (Hidden from public visitors)
+  const [isTrackingOpen, setIsTrackingOpen] = useState<boolean>(false);
+  const [adminUser, setAdminUser] = useState<User | null>(auth.currentUser);
+  const secretTapCountRef = useRef<number>(0);
+  const secretTapTimerRef = useRef<number | null>(null);
+
+  const isAdminSignedIn = isAuthorizedAdminUser(adminUser);
+
+  // Track authenticated admin status & stealth keyboard/URL triggers
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setAdminUser(isAuthorizedAdminUser(user) ? user : null);
+    });
+
+    const checkSecretUrlTrigger = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash === '#kyt-admin' || search.includes('admin=kyt')) {
+        setIsTrackingOpen(true);
+      }
+    };
+    checkSecretUrlTrigger();
+    window.addEventListener('hashchange', checkSecretUrlTrigger);
+
+    const handleSecretKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsTrackingOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleSecretKeyDown);
+
+    return () => {
+      unsub();
+      window.removeEventListener('hashchange', checkSecretUrlTrigger);
+      window.removeEventListener('keydown', handleSecretKeyDown);
+    };
+  }, []);
+
+  const handleSecretFooterTap = () => {
+    secretTapCountRef.current += 1;
+    if (secretTapTimerRef.current) {
+      window.clearTimeout(secretTapTimerRef.current);
+    }
+    if (secretTapCountRef.current >= 5) {
+      secretTapCountRef.current = 0;
+      setIsTrackingOpen(true);
+      return;
+    }
+    secretTapTimerRef.current = window.setTimeout(() => {
+      secretTapCountRef.current = 0;
+    }, 1800);
+  };
+
+  // Initialize external tracking pixels (GA4/GTM/Meta/TikTok) & record initial page_view
+  useEffect(() => {
+    const cfg = loadLocalPixelConfig();
+    injectExternalTrackingPixels(cfg);
+    trackKytEvent({
+      eventType: 'page_view',
+      targetId: 'home',
+      targetLabel: 'KYT Vietnam Official Store Network',
+      category: 'Landing Page',
+      lang: 'VIE',
+    });
+  }, []);
+
+  const handleLanguageChange = (nextLang: Language) => {
+    if (nextLang === lang) return;
+    setLang(nextLang);
+    trackKytEvent({
+      eventType: 'language_switch',
+      targetId: nextLang,
+      targetLabel: nextLang === 'ENG' ? 'English (ENG)' : 'Tiếng Việt (VIE)',
+      category: 'Header Language Toggle',
+      lang: nextLang,
+    });
+  };
 
   // Extract unique Provinces with store counts
   const provincesWithCounts = useMemo(() => {
@@ -79,6 +171,34 @@ export default function App() {
   const handleSelectProvince = (province: string) => {
     setSelectedProvince(province);
     setSelectedDistrict('ALL');
+    trackKytEvent({
+      eventType: 'province_filter',
+      targetId: province,
+      targetLabel: province === 'ALL' ? (isEn ? 'Nationwide' : 'Toàn quốc') : province,
+      category: 'Store Network Filter',
+      lang,
+    });
+  };
+
+  const handleOpenStoreModal = (store: StoreLocation) => {
+    setActiveStoreModal(store);
+    trackKytEvent({
+      eventType: 'store_detail_open',
+      targetId: store.id,
+      targetLabel: store.name,
+      category: store.province,
+      lang,
+    });
+  };
+
+  const handleTrackStoreDirections = (store: StoreLocation) => {
+    trackKytEvent({
+      eventType: 'store_directions_click',
+      targetId: store.id,
+      targetLabel: store.name,
+      category: store.province,
+      lang,
+    });
   };
 
   // Filtered Stores
@@ -162,7 +282,7 @@ export default function App() {
             >
               <button
                 type="button"
-                onClick={() => setLang('VIE')}
+                onClick={() => handleLanguageChange('VIE')}
                 aria-pressed={lang === 'VIE'}
                 className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
                   lang === 'VIE'
@@ -174,7 +294,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setLang('ENG')}
+                onClick={() => handleLanguageChange('ENG')}
                 aria-pressed={lang === 'ENG'}
                 className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
                   lang === 'ENG'
@@ -185,6 +305,21 @@ export default function App() {
                 ENG
               </button>
             </div>
+
+            {/* Visible ONLY when authorized Cloud Admin (boruto47001@gmail.com) is signed in */}
+            {isAdminSignedIn && (
+              <button
+                type="button"
+                onClick={() => setIsTrackingOpen(true)}
+                title="Cloud Admin & Google Drive Sync (Hidden from public)"
+                className="p-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden lg:inline text-[11px] font-mono font-semibold uppercase tracking-wider">
+                  Admin · Drive
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -414,7 +549,7 @@ export default function App() {
                 {filteredStores.map((store) => (
                   <article
                     key={store.id}
-                    onClick={() => setActiveStoreModal(store)}
+                    onClick={() => handleOpenStoreModal(store)}
                     className="group bg-white rounded-2xl border border-neutral-200 hover:border-neutral-900 transition-all duration-150 hover:-translate-y-0.5 flex flex-col overflow-hidden cursor-pointer"
                   >
                     {/* Card Visual Header */}
@@ -447,7 +582,10 @@ export default function App() {
                           href={getStoreMapsUrl(store.address)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTrackStoreDirections(store);
+                          }}
                           title={
                             isEn
                               ? `Direct Google Maps directions to: ${store.address}`
@@ -469,6 +607,7 @@ export default function App() {
                             href={getStoreMapsUrl(store.address)}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => handleTrackStoreDirections(store)}
                             title={
                               isEn
                                 ? `Direct Google Maps navigation: ${store.address}`
@@ -481,7 +620,7 @@ export default function App() {
                           </a>
 
                           <button
-                            onClick={() => setActiveStoreModal(store)}
+                            onClick={() => handleOpenStoreModal(store)}
                             className="py-2.5 px-3.5 text-xs font-semibold text-[#1D1D1F] bg-[#F5F5F7] hover:bg-neutral-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 min-h-[40px]"
                           >
                             <span>{isEn ? 'Details' : 'Chi tiết'}</span>
@@ -550,6 +689,15 @@ export default function App() {
                     href={channel.url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() =>
+                      trackKytEvent({
+                        eventType: 'ecommerce_click',
+                        targetId: channel.id,
+                        targetLabel: channel.name,
+                        category: channel.handle,
+                        lang,
+                      })
+                    }
                     className={`group relative rounded-2xl bg-[#16161A] hover:bg-[#1C1C22] border p-5 sm:p-7 transition-all duration-150 hover:-translate-y-0.5 flex flex-col justify-between gap-5 overflow-hidden ${
                       isShopee
                         ? 'border-white/10 hover:border-[#EE4D2D]/50 hover:shadow-lg hover:shadow-[#EE4D2D]/10'
@@ -673,7 +821,10 @@ export default function App() {
       {/* 5. MINIMALIST QUIET FOOTER */}
       <footer className="bg-[#0A0A0A] text-neutral-400 border-t border-white/[0.08] py-10 sm:py-12">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
+          <div
+            onClick={handleSecretFooterTap}
+            className="flex items-center gap-4 select-none"
+          >
             <KytBrandLogo className="h-8 w-auto shrink-0" />
             <div className="space-y-0.5">
               <p className="text-xs font-bold text-white tracking-wide">{brandConfig.brandName}</p>
@@ -699,6 +850,15 @@ export default function App() {
               href="https://shopee.vn/kytvietnam?entryPoint=ShopBySearch&searchKeyword=kyt"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                trackKytEvent({
+                  eventType: 'ecommerce_click',
+                  targetId: 'shopee',
+                  targetLabel: 'Shopee (Footer)',
+                  category: 'shopee.vn/kytvietnam',
+                  lang,
+                })
+              }
               className="hover:text-[#EE4D2D] transition-colors"
             >
               Shopee
@@ -707,6 +867,15 @@ export default function App() {
               href="https://vt.tiktok.com/ZSghUua4x/?page=TikTokShop"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                trackKytEvent({
+                  eventType: 'ecommerce_click',
+                  targetId: 'tiktok',
+                  targetLabel: 'TikTok Shop (Footer)',
+                  category: 'KYT Vietnam TikTok Shop',
+                  lang,
+                })
+              }
               className="hover:text-white transition-colors"
             >
               TikTok Shop
@@ -719,6 +888,13 @@ export default function App() {
       <StoreDetailModal
         store={activeStoreModal}
         onClose={() => setActiveStoreModal(null)}
+        lang={lang}
+      />
+
+      {/* Website Tracking & Conversion Analytics Studio Modal */}
+      <TrackingDashboardModal
+        isOpen={isTrackingOpen}
+        onClose={() => setIsTrackingOpen(false)}
         lang={lang}
       />
     </div>

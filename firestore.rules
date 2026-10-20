@@ -1,0 +1,190 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'boruto47001@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'boruto47001@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 3. Entity Validation Blueprints (Synchronized verbatim with firebase-blueprint.json)
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.role is string && data.role.size() == 5 && data.role == 'admin' &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidTrackingEvent(data) {
+      return data.keys().hasAll([
+          'eventId',
+          'ownerId',
+          'eventType',
+          'targetId',
+          'targetLabel',
+          'category',
+          'deviceType',
+          'lang',
+          'sessionId',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'eventId',
+          'ownerId',
+          'eventType',
+          'targetId',
+          'targetLabel',
+          'category',
+          'deviceType',
+          'lang',
+          'sessionId',
+          'createdAt'
+        ]) &&
+        data.eventId is string && data.eventId.size() >= 1 && data.eventId.size() <= 128 && data.eventId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.eventType is string && data.eventType.size() >= 1 && data.eventType.size() <= 64 &&
+        data.eventType in [
+          'page_view',
+          'helmet_select',
+          'helmet_detail_view',
+          'store_directions_click',
+          'store_detail_open',
+          'store_address_copy',
+          'province_filter',
+          'store_search',
+          'ecommerce_click',
+          'language_switch'
+        ] &&
+        data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
+        data.targetLabel is string && data.targetLabel.size() >= 1 && data.targetLabel.size() <= 200 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 120 &&
+        data.deviceType is string && data.deviceType.size() >= 6 && data.deviceType.size() <= 7 &&
+        data.deviceType in ['mobile', 'desktop', 'tablet'] &&
+        data.lang is string && data.lang.size() == 3 && data.lang in ['VIE', 'ENG'] &&
+        data.sessionId is string && data.sessionId.size() >= 1 && data.sessionId.size() <= 128 && data.sessionId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidTrackingConfig(data) {
+      return data.keys().hasAll([
+          'configId',
+          'ownerId',
+          'ga4MeasurementId',
+          'gtmContainerId',
+          'metaPixelId',
+          'tiktokPixelId',
+          'enableAutoTracking',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'configId',
+          'ownerId',
+          'ga4MeasurementId',
+          'gtmContainerId',
+          'metaPixelId',
+          'tiktokPixelId',
+          'enableAutoTracking',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.configId is string && data.configId.size() >= 1 && data.configId.size() <= 128 && data.configId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.ga4MeasurementId is string && data.ga4MeasurementId.size() <= 64 &&
+        data.gtmContainerId is string && data.gtmContainerId.size() <= 64 &&
+        data.metaPixelId is string && data.metaPixelId.size() <= 64 &&
+        data.tiktokPixelId is string && data.tiktokPixelId.size() <= 64 &&
+        data.enableAutoTracking is string && data.enableAutoTracking.size() >= 4 && data.enableAutoTracking.size() <= 5 &&
+        data.enableAutoTracking in ['true', 'false'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Collection 1: /admins/{adminId}
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isBootstrappedAdmin());
+      allow list: if isBootstrappedAdmin() && resource.data.role == 'admin';
+      allow create: if isBootstrappedAdmin() &&
+        isValidId(adminId) &&
+        isValidAdminUser(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    // Collection 2: /tracking_events/{eventId}
+    match /tracking_events/{eventId} {
+      allow get: if isSignedIn() && isValidId(eventId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isSignedIn() &&
+        isValidId(eventId) &&
+        isValidTrackingEvent(incoming()) &&
+        incoming().eventId == eventId &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(eventId);
+    }
+
+    // Collection 3: /tracking_configs/{configId}
+    match /tracking_configs/{configId} {
+      allow get: if isSignedIn() && isValidId(configId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isAdmin() &&
+        isValidId(configId) &&
+        isValidTrackingConfig(incoming()) &&
+        incoming().configId == configId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(configId) &&
+        isValidTrackingConfig(incoming()) &&
+        incoming().configId == existing().configId &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isBootstrappedAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'ga4MeasurementId',
+            'gtmContainerId',
+            'metaPixelId',
+            'tiktokPixelId',
+            'enableAutoTracking',
+            'updatedAt'
+          ])
+        );
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+  }
+}

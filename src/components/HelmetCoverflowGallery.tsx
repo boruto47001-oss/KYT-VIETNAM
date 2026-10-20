@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
 import { HelmetShowcase, Language } from '../data/kytData';
+import { trackKytEvent } from '../lib/tracking';
 
 interface HelmetCoverflowGalleryProps {
   helmets: HelmetShowcase[];
@@ -78,6 +79,16 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
     onSelectHelmet(id);
     setActiveIndex(0);
     setIsDetailOpen(false);
+    const chosen = helmets.find((h) => h.id === id);
+    if (chosen) {
+      trackKytEvent({
+        eventType: 'helmet_select',
+        targetId: chosen.id,
+        targetLabel: chosen.name,
+        category: chosen.shortName,
+        lang,
+      });
+    }
   };
 
   const handlePrev = useCallback(() => {
@@ -260,6 +271,13 @@ export const HelmetCoverflowGallery: React.FC<HelmetCoverflowGalleryProps> = ({
                     onClick={() => {
                       if (isCenter) {
                         setIsDetailOpen(true);
+                        trackKytEvent({
+                          eventType: 'helmet_detail_view',
+                          targetId: slide.sku,
+                          targetLabel: slide.title,
+                          category: activeHelmet.shortName,
+                          lang,
+                        });
                       } else {
                         setActiveIndex(index);
                       }

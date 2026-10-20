@@ -1,0 +1,213 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator account for viewing and managing KYT Vietnam tracking analytics.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the administrator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role identifier for the administrator.",
+          "enum": ["admin"],
+          "minLength": 5,
+          "maxLength": 5
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the admin record was created."
+        }
+      },
+      "required": ["uid", "role", "createdAt"]
+    },
+    "TrackingEvent": {
+      "title": "TrackingEvent",
+      "description": "Website interaction telemetry event recorded from KYT Vietnam visitors and synced to Firestore.",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "description": "Unique identifier for the tracking event.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated user or admin syncing the event.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Category of interaction event.",
+          "enum": [
+            "page_view",
+            "helmet_select",
+            "helmet_detail_view",
+            "store_directions_click",
+            "store_detail_open",
+            "store_address_copy",
+            "province_filter",
+            "store_search",
+            "ecommerce_click",
+            "language_switch"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "targetId": {
+          "type": "string",
+          "description": "Identifier of the clicked store, helmet model, slide SKU, or channel.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetLabel": {
+          "type": "string",
+          "description": "Human-readable name of the store, helmet, province, or channel.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Secondary grouping such as province name, helmet series, or platform.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "deviceType": {
+          "type": "string",
+          "description": "Visitor device form factor.",
+          "enum": ["mobile", "desktop", "tablet"],
+          "minLength": 6,
+          "maxLength": 7
+        },
+        "lang": {
+          "type": "string",
+          "description": "Active UI language when the event occurred.",
+          "enum": ["VIE", "ENG"],
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Anonymous visitor session identifier.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the event was persisted."
+        }
+      },
+      "required": [
+        "eventId",
+        "ownerId",
+        "eventType",
+        "targetId",
+        "targetLabel",
+        "category",
+        "deviceType",
+        "lang",
+        "sessionId",
+        "createdAt"
+      ]
+    },
+    "TrackingConfig": {
+      "title": "TrackingConfig",
+      "description": "External marketing pixel and analytics integration configuration (GA4, GTM, Meta Pixel, TikTok Pixel).",
+      "type": "object",
+      "properties": {
+        "configId": {
+          "type": "string",
+          "description": "Document identifier for the tracking configuration.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the administrator who owns the configuration.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ga4MeasurementId": {
+          "type": "string",
+          "description": "Google Analytics 4 Measurement ID (e.g., G-XXXXXXXXXX).",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "gtmContainerId": {
+          "type": "string",
+          "description": "Google Tag Manager Container ID (e.g., GTM-XXXXXXX).",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "metaPixelId": {
+          "type": "string",
+          "description": "Meta / Facebook Pixel ID.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "tiktokPixelId": {
+          "type": "string",
+          "description": "TikTok Pixel ID.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "enableAutoTracking": {
+          "type": "string",
+          "description": "Whether automatic interaction tracking is enabled ('true' or 'false').",
+          "enum": ["true", "false"],
+          "minLength": 4,
+          "maxLength": 5
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the config was first created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the config was last updated."
+        }
+      },
+      "required": [
+        "configId",
+        "ownerId",
+        "ga4MeasurementId",
+        "gtmContainerId",
+        "metaPixelId",
+        "tiktokPixelId",
+        "enableAutoTracking",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Stores authorized administrator UIDs for RBAC verification."
+    },
+    "/tracking_events/{eventId}": {
+      "schema": { "$ref": "#/entities/TrackingEvent" },
+      "description": "Stores validated website interaction tracking events."
+    },
+    "/tracking_configs/{configId}": {
+      "schema": { "$ref": "#/entities/TrackingConfig" },
+      "description": "Stores marketing pixel IDs (GA4, GTM, Meta Pixel, TikTok Pixel) managed by administrators."
+    }
+  }
+}
