@@ -26,6 +26,7 @@ import {
 import { KytBrandLogo, ShopeeOfficialLogo, StoreShowroomVisual } from './components/SmartAssetImage';
 import { HelmetCoverflowGallery } from './components/HelmetCoverflowGallery';
 import { StoreDetailModal } from './components/StoreDetailModal';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const brandConfig = INITIAL_BRAND_CONFIG;
@@ -721,6 +722,9 @@ export default function App() {
         onClose={() => setActiveStoreModal(null)}
         lang={lang}
       />
+      
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
