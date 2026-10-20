@@ -22,7 +22,7 @@ import {
   StoreLocation,
   getStoreMapsUrl,
 } from './data/kytData';
-import { KytBrandLogo, StoreShowroomVisual } from './components/SmartAssetImage';
+import { KytBrandLogo, ShopeeOfficialLogo, StoreShowroomVisual } from './components/SmartAssetImage';
 import { HelmetCoverflowGallery } from './components/HelmetCoverflowGallery';
 import { StoreDetailModal } from './components/StoreDetailModal';
 
@@ -171,10 +171,9 @@ export default function App() {
             </p>
 
             {/* Ultra-Clean Set.Space Centered Headline */}
-            <h1 className="w-full max-w-5xl text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold uppercase tracking-wide leading-[1.15] text-balance">
-              TÌM KIẾM GIẢI PHÁP MUA HÀNG
-              <br />
-              <span className="text-[#FF1E1A] drop-shadow-[0_0_24px_rgba(255,30,26,0.65)] font-extrabold">
+            <h1 className="w-full max-w-5xl text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold uppercase tracking-wide leading-tight">
+              <span className="block">TÌM KIẾM GIẢI PHÁP MUA HÀNG</span>
+              <span className="block mt-2.5 sm:mt-4 md:mt-5 text-[#FF1E1A] drop-shadow-[0_0_24px_rgba(255,30,26,0.65)] font-extrabold">
                 TỐI ƯU, CHÍNH HÃNG
               </span>
             </h1>
@@ -239,35 +238,35 @@ export default function App() {
                     href={channel.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group relative rounded-2xl bg-[#16161A] hover:bg-[#1C1C22] border border-white/10 hover:border-white/25 p-5 sm:p-7 transition-all duration-150 hover:-translate-y-0.5 flex flex-col justify-between gap-5 overflow-hidden"
+                    className={`group relative rounded-2xl bg-[#16161A] hover:bg-[#1C1C22] border p-5 sm:p-7 transition-all duration-150 hover:-translate-y-0.5 flex flex-col justify-between gap-5 overflow-hidden ${
+                      isShopee
+                        ? 'border-white/10 hover:border-[#EE4D2D]/50 hover:shadow-lg hover:shadow-[#EE4D2D]/10'
+                        : 'border-white/10 hover:border-white/25'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3.5">
                         {/* Channel Brand Icon Box */}
-                        <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 font-extrabold text-white shadow-lg ${
-                            isShopee
-                              ? 'bg-gradient-to-br from-[#EE4D2D] to-[#FF7337]'
-                              : 'bg-[#0A0A0A] border border-white/15'
-                          }`}
-                        >
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-md shadow-black/40">
                           {isShopee ? (
-                            <ShoppingBag className="w-6 h-6 text-white" />
+                            <ShopeeOfficialLogo className="w-full h-full" />
                           ) : (
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="w-6 h-6 fill-current text-white"
-                              aria-hidden="true"
-                            >
-                              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-                            </svg>
+                            <div className="w-full h-full bg-[#0A0A0A] border border-white/15 flex items-center justify-center">
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-6 h-6 fill-current text-white"
+                                aria-hidden="true"
+                              >
+                                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+                              </svg>
+                            </div>
                           )}
                         </div>
 
                         <div>
                           <span
                             className={`text-[10px] font-mono uppercase tracking-widest font-semibold ${
-                              isShopee ? 'text-[#FF7337]' : 'text-[#00F2FE]'
+                              isShopee ? 'text-[#EE4D2D]' : 'text-[#00F2FE]'
                             }`}
                           >
                             {channel.badge}
@@ -281,7 +280,7 @@ export default function App() {
                       <span
                         className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
                           isShopee
-                            ? 'bg-[#EE4D2D] group-hover:bg-[#D73211] text-white'
+                            ? 'bg-[#EE4D2D] group-hover:bg-[#D73211] text-white shadow-sm shadow-[#EE4D2D]/30'
                             : 'bg-white text-[#0A0A0A] group-hover:bg-neutral-200'
                         }`}
                       >

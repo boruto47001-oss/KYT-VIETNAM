@@ -5,23 +5,43 @@ interface KytLogoProps {
 }
 
 /**
- * Uses the exact official KYT Logo image file (/kyt-logo.svg / /kyt-logo.png)
+ * Uses the exact official modern White KYT Logo image file (/kyt-logo-white.png)
  */
-export const KytBrandLogo: React.FC<KytLogoProps> = ({ className = 'h-9 w-auto' }) => {
-  const [src, setSrc] = useState('/kyt-logo.svg');
-
+export const KytBrandLogo: React.FC<KytLogoProps> = ({ className = 'h-7 sm:h-8 w-auto' }) => {
   return (
     <img
-      src={src}
+      src="/kyt-logo-white.png?v=5"
       alt="KYT Helmet"
-      referrerPolicy="no-referrer"
-      onError={() => {
-        if (src !== '/kyt-logo.png') {
-          setSrc('/kyt-logo.png');
-        }
-      }}
+      loading="eager"
+      decoding="async"
       className={`select-none object-contain ${className}`}
     />
+  );
+};
+
+interface ShopeeLogoProps {
+  className?: string;
+}
+
+/**
+ * Official Shopee Icon: #EE4D2D brand orange background, centered white shopping bag with handle hole and 'S' cutout
+ */
+export const ShopeeOfficialLogo: React.FC<ShopeeLogoProps> = ({ className = 'w-full h-full' }) => {
+  return (
+    <svg
+      viewBox="0 0 400 400"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Shopee"
+    >
+      <rect width="400" height="400" rx="84" fill="#EE4D2D" />
+      <path
+        fill="#FFFFFF"
+        transform="translate(69.33, 63.9)"
+        d="m174.212 201.122c-1.496 12.868-9.297 23.287-21.379 28.438-6.77 2.854-15.811 4.418-23.063 3.953-11.157-.465-21.616-3.229-31.378-8.137-3.377-1.859-8.581-5.344-12.551-8.598-.979-.93-1.143-1.395-.433-2.357.312-.564 1.009-1.596 2.438-3.686 2.179-3.081 2.412-3.488 2.644-3.883.697-1 1.759-1.091 2.869-.301.152.155.152.155.236.23.148.162.148.162.546.465.411.315.709.465.782.643 10.461 8.189 22.638 12.838 34.931 13.303 17.063-.23 29.325-7.902 31.584-19.758 2.326-12.903-7.843-24.167-27.729-30.448-6.265-1.859-22.031-8.156-24.942-9.908-13.629-7.983-20.026-18.461-19.096-31.455 1.395-17.958 18.078-31.324 39.163-31.441 9.359 0 18.793 1.951 27.743 5.716 3.228 1.373 8.989 4.494 10.905 5.986 1.15.852 1.395 1.781.686 2.822-.236.635-.93 1.581-2.128 3.609v0c-1.747 2.664-1.812 2.775-2.129 3.361-.622.978-1.511 1.056-2.695.356-9.566-6.506-20.356-9.762-32.145-9.994-14.643.232-25.653 8.96-26.362 20.919-.146 10.743 7.877 18.569 25.252 24.462 35.339 11.385 48.819 24.686 46.251 45.703m-43.576-185.385c22.96 0 41.717 21.785 42.646 49.095h-85.237c.82-27.31 19.632-49.095 42.591-49.095m119.001 54.269c0-2.85-2.206-5.174-5.021-5.174h-.184-55.101c-1.394-36.032-27.168-64.832-58.695-64.832-31.546 0-57.253 28.8-58.628 64.832h-55.332c-2.775.063-4.977 2.336-4.977 5.174 0 .164 0 .236 0 .4h-.063l7.859 173.798c0 .47.092.944.092 1.509 0 .11.015.144.015.351v.266l.058.092c1.183 12.117 9.937 21.777 21.901 22.25v.092h175.509c.092 0 .146 0 .237 0 .136 0 .136 0 .236 0h .364v-.092c12.134-.295 22.069-10.133 23.016-22.383v0l .053-.225c0-.115 0-.24 0-.351 0-.354.092-.579.092-.947l8.569-174.524v0c0-.064 0-.163 0-.236"
+      />
+    </svg>
   );
 };
 
@@ -190,7 +210,7 @@ export const HelmetVisual: React.FC<HelmetArtworkProps> = ({
 
         {/* Official KYT Logo on Helmet Shell */}
         <image
-          href="/kyt-logo.svg"
+          href="/kyt-logo-white.png?v=5"
           x="255"
           y="218"
           width="105"
@@ -278,20 +298,21 @@ export const StoreShowroomVisual: React.FC<StoreArtworkProps> = ({
           </g>
         ))}
 
-        {/* Wall Brand Monolith Right with Official KYT Logo */}
+        {/* Wall Brand Monolith Right with Official White KYT Logo */}
         <rect
           x="336"
           y="96"
           width="168"
           height="168"
           rx="6"
-          fill={isRedAccent ? '#E10600' : '#0A0A0C'}
-          stroke={isDark ? '#2E2E32' : '#18181B'}
+          fill="#0A0A0C"
+          stroke={isRedAccent ? '#E10600' : isDark ? '#2E2E32' : '#18181B'}
           strokeWidth="1.5"
         />
+        {isRedAccent && <rect x="336" y="96" width="168" height="4" fill="#E10600" />}
 
         <image
-          href="/kyt-logo.svg"
+          href="/kyt-logo-white.png?v=5"
           x="362"
           y="124"
           width="116"
@@ -302,12 +323,12 @@ export const StoreShowroomVisual: React.FC<StoreArtworkProps> = ({
           x="420"
           y="194"
           textAnchor="middle"
-          fill={isRedAccent ? '#FFFFFF' : '#A1A1AA'}
+          fill="#A1A1AA"
           fontFamily="JetBrains Mono, monospace"
           fontSize="9.5"
           letterSpacing="1.5"
         >
-          WORLD CLASS HELMET
+          WORLD CLASS HELMETS
         </text>
         <line x1="372" y1="208" x2="468" y2="208" stroke="#FFFFFF" strokeOpacity="0.2" strokeWidth="1" />
         <text
