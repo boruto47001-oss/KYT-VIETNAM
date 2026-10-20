@@ -66,11 +66,16 @@ export const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ store, onClo
           <div className="py-5 border-y border-neutral-200 space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-[#6E6E73]">
               <MapPin className="w-4 h-4 text-[#E10600] shrink-0" />
-              <span>Địa chỉ cửa hàng</span>
+              <span>Địa chỉ cửa hàng (Bấm để mở bản đồ)</span>
             </div>
-            <p className="text-base text-[#0A0A0A] leading-relaxed font-semibold">
+            <a
+              href={getStoreMapsUrl(store.address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-base text-[#0A0A0A] hover:text-[#E10600] hover:underline leading-relaxed font-semibold transition-colors"
+            >
               {store.address}
-            </p>
+            </a>
           </div>
 
           {/* Available Helmet Lines */}

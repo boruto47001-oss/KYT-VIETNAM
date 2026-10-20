@@ -218,7 +218,13 @@ export const OFFICIAL_ONLINE_CHANNELS: OnlineChannel[] = [
 ];
 
 export function getStoreMapsUrl(address: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.trim())}`;
+  const cleanDestination = address
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\bĐ\.\s*/g, 'Đường ')
+    .replace(/\bTP\.HCM\b/gi, 'TP. Hồ Chí Minh')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanDestination)}`;
 }
 
 interface RawStoreSeed {

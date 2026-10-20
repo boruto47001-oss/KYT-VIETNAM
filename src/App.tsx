@@ -121,16 +121,16 @@ export default function App() {
               Dòng nón
             </a>
             <a
-              href="#online-order"
-              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
-            >
-              Đặt hàng Online
-            </a>
-            <a
               href="#store-locator"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
               Hệ thống cửa hàng
+            </a>
+            <a
+              href="#online-order"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
+            >
+              Đặt hàng Online
             </a>
             <a
               href="#kyt-standards"
@@ -207,111 +207,14 @@ export default function App() {
           </div>
         </section>
 
-        {/* 2.5. OFFICIAL ONLINE ORDERING (Shopee & TikTok Shop) */}
-        <section
-          id="online-order"
-          className="py-10 sm:py-16 bg-[#0F0F12] text-white border-b border-white/[0.08]"
-        >
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400">
-                  <span className="text-[#E10600] font-bold">02</span>
-                  <span aria-hidden="true">·</span>
-                  <span>OFFICIAL E-COMMERCE</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white text-balance">
-                  Đặt hàng Online chính hãng
-                </h2>
-              </div>
-              <p className="text-xs sm:text-sm text-neutral-400 max-w-md leading-relaxed">
-                Mua sắm trực tiếp tại gian hàng chính thức của KYT Vietnam trên Shopee và TikTok Shop.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              {OFFICIAL_ONLINE_CHANNELS.map((channel) => {
-                const isShopee = channel.id === 'shopee';
-                return (
-                  <a
-                    key={channel.id}
-                    href={channel.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`group relative rounded-2xl bg-[#16161A] hover:bg-[#1C1C22] border p-5 sm:p-7 transition-all duration-150 hover:-translate-y-0.5 flex flex-col justify-between gap-5 overflow-hidden ${
-                      isShopee
-                        ? 'border-white/10 hover:border-[#EE4D2D]/50 hover:shadow-lg hover:shadow-[#EE4D2D]/10'
-                        : 'border-white/10 hover:border-white/25'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3.5">
-                        {/* Channel Brand Icon Box */}
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-md shadow-black/40">
-                          {isShopee ? (
-                            <ShopeeOfficialLogo className="w-full h-full" />
-                          ) : (
-                            <div className="w-full h-full bg-[#0A0A0A] border border-white/15 flex items-center justify-center">
-                              <svg
-                                viewBox="0 0 24 24"
-                                className="w-6 h-6 fill-current text-white"
-                                aria-hidden="true"
-                              >
-                                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <span
-                            className={`text-[10px] font-mono uppercase tracking-widest font-semibold ${
-                              isShopee ? 'text-[#EE4D2D]' : 'text-[#00F2FE]'
-                            }`}
-                          >
-                            {channel.badge}
-                          </span>
-                          <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white mt-0.5">
-                            {channel.name}
-                          </h3>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
-                          isShopee
-                            ? 'bg-[#EE4D2D] group-hover:bg-[#D73211] text-white shadow-sm shadow-[#EE4D2D]/30'
-                            : 'bg-white text-[#0A0A0A] group-hover:bg-neutral-200'
-                        }`}
-                      >
-                        <span>Mua ngay</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 pt-3 border-t border-white/[0.08]">
-                      <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                        {channel.description}
-                      </p>
-                      <p className="text-xs font-mono text-neutral-500 truncate">
-                        {channel.handle}
-                      </p>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* 3. STORE LOCATOR DIRECTORY (White & Silver Apple Retail Canvas) */}
+        {/* 2. STORE LOCATOR DIRECTORY (White & Silver Apple Retail Canvas) */}
         <section id="store-locator" className="py-12 sm:py-20 bg-white text-[#1D1D1F]">
           <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-10">
-            {/* Section Title (Set.Space Chapter Numbering 03) */}
+            {/* Section Title (Set.Space Chapter Numbering 02) */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 sm:pb-8 border-b border-neutral-200">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#6E6E73]">
-                  <span className="text-[#E10600] font-bold">03</span>
+                  <span className="text-[#E10600] font-bold">02</span>
                   <span aria-hidden="true">·</span>
                   <span>KYT OFFICIAL STORE NETWORK</span>
                 </div>
@@ -487,11 +390,18 @@ export default function App() {
                           {store.name}
                         </h3>
 
-                        {/* Street Address */}
-                        <p className="text-sm text-[#1D1D1F] leading-relaxed flex items-start gap-2 pt-0.5">
+                        {/* Street Address — Clickable Direct to Google Maps Destination */}
+                        <a
+                          href={getStoreMapsUrl(store.address)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Chỉ đường trực tiếp đến: ${store.address}`}
+                          className="text-sm text-[#1D1D1F] hover:text-[#E10600] hover:underline leading-relaxed flex items-start gap-2 pt-0.5 transition-colors"
+                        >
                           <MapPin className="w-4 h-4 text-[#E10600] shrink-0 mt-0.5" />
                           <span>{store.address}</span>
-                        </p>
+                        </a>
                       </div>
 
                       <div className="pt-3.5 border-t border-neutral-100">
@@ -503,7 +413,7 @@ export default function App() {
                             href={getStoreMapsUrl(store.address)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`Tìm trên Google Maps: ${store.address}`}
+                            title={`Chỉ đường trực tiếp trên Google Maps: ${store.address}`}
                             className="flex-1 py-2.5 px-4 text-xs font-semibold text-white bg-[#0A0A0A] hover:bg-[#E10600] rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 min-h-[40px]"
                           >
                             <Navigation className="w-3.5 h-3.5" />
@@ -542,6 +452,103 @@ export default function App() {
                 </button>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* 3. OFFICIAL ONLINE ORDERING (Shopee & TikTok Shop) */}
+        <section
+          id="online-order"
+          className="py-10 sm:py-16 bg-[#0F0F12] text-white border-t border-b border-white/[0.08]"
+        >
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400">
+                  <span className="text-[#E10600] font-bold">03</span>
+                  <span aria-hidden="true">·</span>
+                  <span>OFFICIAL E-COMMERCE</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white text-balance">
+                  Đặt hàng Online chính hãng
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-400 max-w-md leading-relaxed">
+                Mua sắm trực tiếp tại gian hàng chính thức của KYT Vietnam trên Shopee và TikTok Shop.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {OFFICIAL_ONLINE_CHANNELS.map((channel) => {
+                const isShopee = channel.id === 'shopee';
+                return (
+                  <a
+                    key={channel.id}
+                    href={channel.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`group relative rounded-2xl bg-[#16161A] hover:bg-[#1C1C22] border p-5 sm:p-7 transition-all duration-150 hover:-translate-y-0.5 flex flex-col justify-between gap-5 overflow-hidden ${
+                      isShopee
+                        ? 'border-white/10 hover:border-[#EE4D2D]/50 hover:shadow-lg hover:shadow-[#EE4D2D]/10'
+                        : 'border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        {/* Channel Brand Icon Box */}
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-md shadow-black/40">
+                          {isShopee ? (
+                            <ShopeeOfficialLogo className="w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full bg-[#0A0A0A] border border-white/15 flex items-center justify-center">
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-6 h-6 fill-current text-white"
+                                aria-hidden="true"
+                              >
+                                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <span
+                            className={`text-[10px] font-mono uppercase tracking-widest font-semibold ${
+                              isShopee ? 'text-[#EE4D2D]' : 'text-[#00F2FE]'
+                            }`}
+                          >
+                            {channel.badge}
+                          </span>
+                          <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white mt-0.5">
+                            {channel.name}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 ${
+                          isShopee
+                            ? 'bg-[#EE4D2D] group-hover:bg-[#D73211] text-white shadow-sm shadow-[#EE4D2D]/30'
+                            : 'bg-white text-[#0A0A0A] group-hover:bg-neutral-200'
+                        }`}
+                      >
+                        <span>Mua ngay</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 pt-3 border-t border-white/[0.08]">
+                      <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                        {channel.description}
+                      </p>
+                      <p className="text-xs font-mono text-neutral-500 truncate">
+                        {channel.handle}
+                      </p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -608,6 +615,9 @@ export default function App() {
             <a href="#flagship-hero" className="hover:text-white transition-colors">
               Dòng nón
             </a>
+            <a href="#store-locator" className="hover:text-white transition-colors">
+              Hệ thống cửa hàng
+            </a>
             <a href="#online-order" className="hover:text-white transition-colors">
               Đặt hàng Online
             </a>
@@ -626,9 +636,6 @@ export default function App() {
               className="hover:text-white transition-colors"
             >
               TikTok Shop
-            </a>
-            <a href="#store-locator" className="hover:text-white transition-colors">
-              Hệ thống cửa hàng
             </a>
           </div>
         </div>
