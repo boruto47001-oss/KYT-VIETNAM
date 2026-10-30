@@ -59,7 +59,9 @@
             "province_filter",
             "store_search",
             "ecommerce_click",
-            "language_switch"
+            "language_switch",
+            "size_guide_interact",
+            "dealer_registration"
           ],
           "minLength": 1,
           "maxLength": 64

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import {
   MapPin,
   Navigation,
@@ -20,18 +21,23 @@ import {
   INITIAL_FLAGSHIP_HELMETS,
   INITIAL_STORE_LOCATIONS,
   OFFICIAL_ONLINE_CHANNELS,
+  SHOPEE_OFFICIAL_URL,
   StoreLocation,
   Language,
   getStoreMapsUrl,
 } from './data/kytData';
 import { KytBrandLogo, ShopeeOfficialLogo, StoreShowroomVisual } from './components/SmartAssetImage';
 import { HelmetCoverflowGallery } from './components/HelmetCoverflowGallery';
+import { HelmetSizeSection } from './components/HelmetSizeSection';
+import { DealerRegistrationSection } from './components/DealerRegistrationSection';
 import { StoreDetailModal } from './components/StoreDetailModal';
 import { TrackingDashboardModal } from './components/TrackingDashboardModal';
 import {
   trackKytEvent,
   loadLocalPixelConfig,
   injectExternalTrackingPixels,
+  isSecretAdminUnlocked,
+  unlockSecretAdmin,
 } from './lib/tracking';
 import {
   auth,
@@ -60,19 +66,29 @@ export default function App() {
   // Store Detail Modal State
   const [activeStoreModal, setActiveStoreModal] = useState<StoreLocation | null>(null);
 
-  // Stealth Tracking & Analytics Studio Modal State (Hidden from public visitors)
+  // Stealth Tracking & Admin Portal State (Unlocked via Shift + K + Y + T + 1 + 2 + 3)
   const [isTrackingOpen, setIsTrackingOpen] = useState<boolean>(false);
   const [adminUser, setAdminUser] = useState<User | null>(auth.currentUser);
+  const [isSecretUnlocked, setIsSecretUnlocked] = useState<boolean>(() =>
+    isSecretAdminUnlocked()
+  );
   const secretTapCountRef = useRef<number>(0);
   const secretTapTimerRef = useRef<number | null>(null);
+  const keySequenceBufferRef = useRef<string>('');
+  const shiftArmedAtRef = useRef<number>(0);
 
-  const isAdminSignedIn = isAuthorizedAdminUser(adminUser);
+  const isAdminSignedIn = isSecretUnlocked || isAuthorizedAdminUser(adminUser);
 
-  // Track authenticated admin status & stealth keyboard/URL triggers
+  // Track authenticated admin status & Shift + K + Y + T + 1 + 2 + 3 secret key combination
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setAdminUser(isAuthorizedAdminUser(user) ? user : null);
     });
+
+    const syncSecretUnlock = () => {
+      setIsSecretUnlocked(isSecretAdminUnlocked());
+    };
+    window.addEventListener('kyt-admin-auth-changed', syncSecretUnlock);
 
     const checkSecretUrlTrigger = () => {
       const hash = window.location.hash.toLowerCase();
@@ -84,16 +100,58 @@ export default function App() {
     checkSecretUrlTrigger();
     window.addEventListener('hashchange', checkSecretUrlTrigger);
 
+    // Normalize key presses for Shift + K + Y + T + 1 + 2 + 3
+    const normalizeSecretKey = (e: KeyboardEvent): string | null => {
+      const code = e.code;
+      const key = e.key.toLowerCase();
+      if (code === 'KeyK' || key === 'k') return 'k';
+      if (code === 'KeyY' || key === 'y') return 'y';
+      if (code === 'KeyT' || key === 't') return 't';
+      if (code === 'Digit1' || code === 'Numpad1' || key === '1' || key === '!') return '1';
+      if (code === 'Digit2' || code === 'Numpad2' || key === '2' || key === '@') return '2';
+      if (code === 'Digit3' || code === 'Numpad3' || key === '3' || key === '#') return '3';
+      return null;
+    };
+
     const handleSecretKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+      if (e.key === 'Shift') {
+        shiftArmedAtRef.current = Date.now();
+        return;
+      }
+
+      if (e.shiftKey) {
+        shiftArmedAtRef.current = Date.now();
+      }
+
+      const mapped = normalizeSecretKey(e);
+      if (!mapped) {
+        keySequenceBufferRef.current = '';
+        return;
+      }
+
+      const shiftRecentlyActive =
+        e.shiftKey || Date.now() - shiftArmedAtRef.current <= 12000;
+
+      if (!shiftRecentlyActive) {
+        keySequenceBufferRef.current = '';
+        return;
+      }
+
+      keySequenceBufferRef.current = (keySequenceBufferRef.current + mapped).slice(-6);
+
+      if (keySequenceBufferRef.current === 'kyt123') {
         e.preventDefault();
-        setIsTrackingOpen((prev) => !prev);
+        keySequenceBufferRef.current = '';
+        unlockSecretAdmin();
+        setIsSecretUnlocked(true);
+        setIsTrackingOpen(true);
       }
     };
     window.addEventListener('keydown', handleSecretKeyDown);
 
     return () => {
       unsub();
+      window.removeEventListener('kyt-admin-auth-changed', syncSecretUnlock);
       window.removeEventListener('hashchange', checkSecretUrlTrigger);
       window.removeEventListener('keydown', handleSecretKeyDown);
     };
@@ -238,7 +296,7 @@ export default function App() {
           </a>
 
           {/* Zone 2: Minimal Single-Line Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8 text-xs uppercase tracking-widest font-mono text-neutral-400">
+          <nav className="hidden lg:flex items-center gap-6 text-xs uppercase tracking-widest font-mono text-neutral-400">
             <a
               href="#flagship-hero"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
@@ -252,16 +310,22 @@ export default function App() {
               {isEn ? 'Store Locator' : 'Hệ thống cửa hàng'}
             </a>
             <a
+              href="#size-guide"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
+            >
+              {isEn ? 'Size Chart' : 'Bảng quy đổi size nón'}
+            </a>
+            <a
               href="#online-order"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
               {isEn ? 'Online Store' : 'Đặt hàng Online'}
             </a>
             <a
-              href="#kyt-standards"
-              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
+              href="#become-dealer"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0 text-[#FF1E1A] font-semibold"
             >
-              {isEn ? 'Standards' : 'Tiêu chuẩn'}
+              {isEn ? 'Become a Dealer' : 'Trở thành đại lý'}
             </a>
           </nav>
 
@@ -336,7 +400,13 @@ export default function App() {
             aria-hidden="true"
           />
 
-          <div className="max-w-[1120px] mx-auto px-4 sm:px-6 flex flex-col items-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.15 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-[1120px] mx-auto px-4 sm:px-6 flex flex-col items-center text-center"
+          >
             {/* Minimalist Kicker */}
             <p className="text-[11px] sm:text-xs font-mono uppercase tracking-[0.2em] text-[#E10600] mb-2.5">
               WORLD CLASS HELMETS
@@ -379,14 +449,20 @@ export default function App() {
                 lang={lang}
               />
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* 2. STORE LOCATOR DIRECTORY (White & Silver Apple Retail Canvas) */}
-        <section id="store-locator" className="py-12 sm:py-20 bg-white text-[#1D1D1F]">
+        <section id="store-locator" className="py-12 sm:py-20 bg-white text-[#1D1D1F] overflow-hidden">
           <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-10">
             {/* Section Title (Set.Space Chapter Numbering 02) */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 sm:pb-8 border-b border-neutral-200">
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.2 }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 sm:pb-8 border-b border-neutral-200"
+            >
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#6E6E73]">
                   <span className="text-[#E10600] font-bold">02</span>
@@ -397,10 +473,16 @@ export default function App() {
                   {isEn ? 'Authorized Dealer Network' : 'Hệ thống cửa hàng'}
                 </h2>
               </div>
-            </div>
+            </motion.div>
 
             {/* Cascading Filter Bar (Mobile-Optimized) */}
-            <div className="p-4 sm:p-6 rounded-2xl bg-[#F5F5F7] border border-neutral-200/80 space-y-4 sm:space-y-5">
+            <motion.div
+              initial={{ opacity: 0, y: 32 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.15 }}
+              transition={{ duration: 0.6, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+              className="p-4 sm:p-6 rounded-2xl bg-[#F5F5F7] border border-neutral-200/80 space-y-4 sm:space-y-5"
+            >
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-end">
                 {/* Filter 1: Tỉnh / Thành phố */}
                 <div className="md:col-span-4">
@@ -541,14 +623,22 @@ export default function App() {
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* 3-Column Store Card Grid (Responsive for Mobile & Desktop) */}
             {filteredStores.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-8">
-                {filteredStores.map((store) => (
-                  <article
+                {filteredStores.map((store, idx) => (
+                  <motion.article
                     key={store.id}
+                    initial={{ opacity: 0, y: 28 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: false, amount: 0.12 }}
+                    transition={{
+                      duration: 0.5,
+                      delay: (idx % 3) * 0.06,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
                     onClick={() => handleOpenStoreModal(store)}
                     className="group bg-white rounded-2xl border border-neutral-200 hover:border-neutral-900 transition-all duration-150 hover:-translate-y-0.5 flex flex-col overflow-hidden cursor-pointer"
                   >
@@ -629,7 +719,7 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                  </article>
+                  </motion.article>
                 ))}
               </div>
             ) : (
@@ -656,16 +746,25 @@ export default function App() {
           </div>
         </section>
 
-        {/* 3. OFFICIAL ONLINE ORDERING (Shopee & TikTok Shop) */}
+        {/* 3. INTERACTIVE HELMET SIZE CALCULATOR & 1:1 SIZE TABLE (11 MODELS) */}
+        <HelmetSizeSection lang={lang} />
+
+        {/* 4. OFFICIAL ONLINE ORDERING (Shopee & TikTok Shop) */}
         <section
           id="online-order"
-          className="py-10 sm:py-16 bg-[#0F0F12] text-white border-t border-b border-white/[0.08]"
+          className="py-10 sm:py-16 bg-[#0F0F12] text-white border-t border-b border-white/[0.08] overflow-hidden"
         >
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8">
+          <motion.div
+            initial={{ opacity: 0, y: 32 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8"
+          >
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400">
-                  <span className="text-[#E10600] font-bold">03</span>
+                  <span className="text-[#E10600] font-bold">04</span>
                   <span aria-hidden="true">·</span>
                   <span>OFFICIAL E-COMMERCE</span>
                 </div>
@@ -761,15 +860,28 @@ export default function App() {
                 );
               })}
             </div>
-          </div>
+          </motion.div>
         </section>
 
-        {/* 4. SET.SPACE STYLE MINIMALIST CHAPTER 04: STANDARDS MICRO-GRID */}
-        <section id="kyt-standards" className="py-14 sm:py-24 bg-[#0A0A0A] text-white border-t border-white/[0.08]">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-10 sm:space-y-14">
+        {/* 5. BECOME AN AUTHORIZED DEALER (With Search + Dropdown City Combobox & Admin-Only .CSV) */}
+        <DealerRegistrationSection
+          lang={lang}
+          isAdminUnlocked={isAdminSignedIn}
+          onOpenAdminModal={() => setIsTrackingOpen(true)}
+        />
+
+        {/* 6. SET.SPACE STYLE MINIMALIST CHAPTER 06: STANDARDS MICRO-GRID */}
+        <section id="kyt-standards" className="py-14 sm:py-24 bg-[#0A0A0A] text-white border-t border-white/[0.08] overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, y: 32 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-[1200px] mx-auto px-4 sm:px-6 space-y-10 sm:space-y-14"
+          >
             <div className="max-w-2xl space-y-2">
               <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-neutral-400">
-                <span className="text-[#E10600] font-bold">04</span>
+                <span className="text-[#E10600] font-bold">06</span>
                 <span aria-hidden="true">·</span>
                 <span>AUTHENTIC KYT STANDARD</span>
               </div>
@@ -814,11 +926,11 @@ export default function App() {
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </section>
       </main>
 
-      {/* 5. MINIMALIST QUIET FOOTER */}
+      {/* 7. MINIMALIST QUIET FOOTER */}
       <footer className="bg-[#0A0A0A] text-neutral-400 border-t border-white/[0.08] py-10 sm:py-12">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div
@@ -843,11 +955,14 @@ export default function App() {
             <a href="#store-locator" className="hover:text-white transition-colors">
               {isEn ? 'Store Locator' : 'Hệ thống cửa hàng'}
             </a>
-            <a href="#online-order" className="hover:text-white transition-colors">
-              {isEn ? 'Online Store' : 'Đặt hàng Online'}
+            <a href="#size-guide" className="hover:text-white transition-colors">
+              {isEn ? 'Size Guide' : 'Đo size nón'}
+            </a>
+            <a href="#become-dealer" className="hover:text-white transition-colors">
+              {isEn ? 'Become a Dealer' : 'Trở thành đại lý'}
             </a>
             <a
-              href="https://shopee.vn/kytvietnam?entryPoint=ShopBySearch&searchKeyword=kyt"
+              href={SHOPEE_OFFICIAL_URL}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() =>

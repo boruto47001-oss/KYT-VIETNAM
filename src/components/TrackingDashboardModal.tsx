@@ -22,6 +22,8 @@ import {
   Lock,
   FileSpreadsheet,
   AlertTriangle,
+  Store,
+  KeyRound,
 } from 'lucide-react';
 import {
   auth,
@@ -37,6 +39,7 @@ import {
   TrackingEventRecord,
   TrackingPixelConfig,
   DriveTrackingFile,
+  DealerApplicationRecord,
   loadLocalEvents,
   loadLocalPixelConfig,
   saveTrackingConfigToCloud,
@@ -49,6 +52,14 @@ import {
   uploadNewTrackingFileToDrive,
   overwriteExistingDriveFile,
   deleteDriveTrackingFile,
+  isSecretAdminUnlocked,
+  unlockSecretAdmin,
+  lockSecretAdmin,
+  loadDealerApplications,
+  deleteDealerApplication,
+  clearAllDealerApplications,
+  buildDealerApplicationsCsv,
+  downloadDealerApplicationsCsv,
   MAX_PIXEL_ID_LENGTH,
 } from '../lib/tracking';
 import { Language } from '../data/kytData';
@@ -79,6 +90,8 @@ const EVENT_TYPE_LABELS: Record<string, { vie: string; eng: string; color: strin
   store_search: { vie: 'Tìm kiếm đại lý', eng: 'Dealer Search', color: 'text-indigo-400' },
   ecommerce_click: { vie: 'Click sàn TMĐT', eng: 'E-Commerce Click', color: 'text-[#EE4D2D]' },
   language_switch: { vie: 'Đổi ngôn ngữ', eng: 'Language Switch', color: 'text-purple-400' },
+  size_guide_interact: { vie: 'Đo size nón', eng: 'Size Calculator', color: 'text-rose-400' },
+  dealer_registration: { vie: 'Đăng ký đại lý', eng: 'Dealer Application', color: 'text-lime-400' },
 };
 
 const GoogleSignInButton: React.FC<{
@@ -90,11 +103,11 @@ const GoogleSignInButton: React.FC<{
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className="gsi-material-button inline-flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white hover:bg-neutral-100 text-[#1f1f1f] font-semibold text-sm shadow-lg transition-all cursor-pointer disabled:opacity-50"
+    className="gsi-material-button inline-flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-[#1f1f1f] font-semibold text-xs shadow-lg transition-all cursor-pointer disabled:opacity-50"
   >
     <div className="gsi-material-button-state" />
-    <div className="gsi-material-button-content-wrapper flex items-center gap-3">
-      <div className="gsi-material-button-icon w-5 h-5 shrink-0">
+    <div className="gsi-material-button-content-wrapper flex items-center gap-2.5">
+      <div className="gsi-material-button-icon w-4 h-4 shrink-0">
         <svg
           version="1.1"
           xmlns="http://www.w3.org/2000/svg"
@@ -131,13 +144,17 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
   lang,
 }) => {
   const isEn = lang === 'ENG';
-  const [activeTab, setActiveTab] = useState<'overview' | 'drive' | 'pixels'>('overview');
+  const [activeTab, setActiveTab] = useState<'dealers' | 'overview' | 'drive' | 'pixels'>('dealers');
+  const [secretUnlocked, setSecretUnlocked] = useState<boolean>(() => isSecretAdminUnlocked());
+  const [manualKeyInput, setManualKeyInput] = useState<string>('');
+
   const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
   const [driveToken, setDriveToken] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
   const [localEvents, setLocalEvents] = useState<TrackingEventRecord[]>([]);
   const [cloudEvents, setCloudEvents] = useState<TrackingEventRecord[]>([]);
+  const [dealerRecords, setDealerRecords] = useState<DealerApplicationRecord[]>([]);
   const [pixelConfig, setPixelConfig] = useState<TrackingPixelConfig>(() =>
     loadLocalPixelConfig()
   );
@@ -154,7 +171,18 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
   const [authError, setAuthError] = useState<string>('');
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
 
-  const isAuthorizedAdmin = isAuthorizedAdminUser(currentUser);
+  // Admin is authorized if unlocked via Shift+K+Y+T+1+2+3 OR signed in with authorized admin email
+  const isAuthorizedAdmin = secretUnlocked || isAuthorizedAdminUser(currentUser);
+
+  // Sync Shift+K+Y+T+1+2+3 unlock status
+  useEffect(() => {
+    const syncAdminState = () => {
+      setSecretUnlocked(isSecretAdminUnlocked());
+    };
+    syncAdminState();
+    window.addEventListener('kyt-admin-auth-changed', syncAdminState);
+    return () => window.removeEventListener('kyt-admin-auth-changed', syncAdminState);
+  }, [isOpen]);
 
   // Merge local + cloud events without duplicates
   const allEvents = useMemo(() => {
@@ -212,35 +240,40 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     return () => unsub();
   }, [refreshDriveState]);
 
-  // Also check in-memory token when modal opens
+  // Check in-memory token when modal opens
   useEffect(() => {
     if (!isOpen) return;
     getAccessToken().then((t) => {
       setDriveToken(t);
-      if (t && isAuthorizedAdmin) {
+      if (t && isAuthorizedAdminUser(currentUser)) {
         refreshDriveState(t);
       }
     });
-  }, [isOpen, isAuthorizedAdmin, refreshDriveState]);
+  }, [isOpen, currentUser, refreshDriveState]);
 
   // Subscribe to Firestore cloud events when signed in as boruto47001@gmail.com
   useEffect(() => {
-    if (!isOpen || !isAuthorizedAdmin) return;
+    if (!isOpen || !isAuthorizedAdminUser(currentUser)) return;
     const unsub = subscribeToCloudEvents((events) => {
       setCloudEvents(events);
     });
     return () => unsub();
-  }, [isOpen, isAuthorizedAdmin]);
+  }, [isOpen, currentUser]);
 
-  // Listen to local tracking updates
+  // Listen to local tracking & dealer application updates
   useEffect(() => {
     if (!isOpen) return;
     const refreshLocal = () => {
       setLocalEvents(loadLocalEvents());
+      setDealerRecords(loadDealerApplications());
     };
     refreshLocal();
     window.addEventListener('kyt-tracking-updated', refreshLocal);
-    return () => window.removeEventListener('kyt-tracking-updated', refreshLocal);
+    window.addEventListener('kyt-dealer-applications-updated', refreshLocal);
+    return () => {
+      window.removeEventListener('kyt-tracking-updated', refreshLocal);
+      window.removeEventListener('kyt-dealer-applications-updated', refreshLocal);
+    };
   }, [isOpen]);
 
   // Aggregated Analytics Metrics
@@ -275,7 +308,11 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
         ecommerceClicks++;
         if (evt.targetId === 'shopee') shopeeClicks++;
         if (evt.targetId === 'tiktok') tiktokClicks++;
-      } else if (evt.eventType === 'helmet_select' || evt.eventType === 'helmet_detail_view') {
+      } else if (
+        evt.eventType === 'helmet_select' ||
+        evt.eventType === 'helmet_detail_view' ||
+        evt.eventType === 'size_guide_interact'
+      ) {
         helmetViews++;
         const existing = helmetRanks.get(evt.targetId) || {
           label: evt.targetLabel,
@@ -317,7 +354,24 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Google Sign-In + Auto Cloud Admin Sync + Auto Google Drive Transfer
+  const handleManualUnlockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = manualKeyInput.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (cleaned === 'kyt123' || cleaned === 'shiftkyt123') {
+      unlockSecretAdmin();
+      setSecretUnlocked(true);
+      setManualKeyInput('');
+      setAuthError('');
+    } else {
+      setAuthError(
+        isEn
+          ? 'Invalid secret combination. Hold Shift and type K + Y + T + 1 + 2 + 3.'
+          : 'Mã tổ hợp không đúng. Hãy giữ phím Shift và nhấn lần lượt K + Y + T + 1 + 2 + 3.'
+      );
+    }
+  };
+
+  // Optional Google Drive Sign-In for cloud sync
   const handleAdminGoogleSignIn = async () => {
     setAuthError('');
     setDriveStatusMsg('');
@@ -331,7 +385,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
         await syncPendingLocalEventsToCloud();
         setIsSyncingCloud(false);
 
-        // Automatically transfer collected tracking data directly to Google Drive on login
         setIsDriveSyncing(true);
         const currentEvents = loadLocalEvents();
         const createdFile = await uploadNewTrackingFileToDrive(
@@ -341,8 +394,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
         await refreshDriveState(result.accessToken);
         setDriveStatusMsg(
           isEn
-            ? `Synced Cloud Admin & uploaded "${createdFile.name}" directly to your Google Drive!`
-            : `Đã đồng bộ Cloud Admin & chuyển thẳng tệp "${createdFile.name}" vào Google Drive của ${AUTHORIZED_ADMIN_EMAIL}!`
+            ? `Synced & uploaded "${createdFile.name}" directly to your Google Drive!`
+            : `Đã đồng bộ & chuyển thẳng tệp "${createdFile.name}" vào Google Drive của ${AUTHORIZED_ADMIN_EMAIL}!`
         );
       }
     } catch (err) {
@@ -350,8 +403,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
         err instanceof Error
           ? err.message
           : isEn
-            ? 'Google sign-in failed.'
-            : 'Đăng nhập Google thất bại.'
+            ? 'Google Drive connection failed.'
+            : 'Kết nối Google Drive thất bại.'
       );
     } finally {
       setIsLoggingIn(false);
@@ -359,11 +412,10 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     }
   };
 
-  // Create a new tracking report file directly in Google Drive
   const handlePushNewReportToDrive = async () => {
     setAuthError('');
     setDriveStatusMsg('');
-    let token = await getAccessToken();
+    const token = await getAccessToken();
     if (!token) {
       await handleAdminGoogleSignIn();
       return;
@@ -391,7 +443,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     }
   };
 
-  // Execute confirmed overwrite or delete on Google Drive
   const handleConfirmDriveMutation = async () => {
     if (!pendingConfirmation || !driveToken) return;
     const { type, file } = pendingConfirmation;
@@ -458,7 +509,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     }
   };
 
-  const handleExportCsv = () => {
+  const handleExportTrackingCsv = () => {
     if (allEvents.length === 0) return;
     const headers = [
       'Event ID',
@@ -509,7 +560,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
   };
 
   // ==========================================================================
-  // LOCKED STATE: ONLY boruto47001@gmail.com CAN VIEW OR ACCESS THIS PANEL
+  // LOCKED STATE: UNLOCK VIA SHIFT + K + Y + T + 1 + 2 + 3
   // ==========================================================================
   if (!isAuthorizedAdmin) {
     return (
@@ -539,18 +590,30 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
           <div className="space-y-2">
             <span className="inline-block text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded bg-white/[0.06] text-[#FF1E1A] font-bold">
-              PRIVATE CLOUD ADMIN · STEALTH MODE
+              PRIVATE ADMIN ACCESS · SHIFT + K + Y + T + 1 + 2 + 3
             </span>
             <h2 id="admin-lock-title" className="text-xl font-extrabold tracking-tight">
               {isEn
-                ? 'Restricted Cloud Admin Portal'
-                : 'Cổng Quản trị Tracking Nội bộ'}
+                ? 'Restricted Admin Portal'
+                : 'Cổng Quản trị Dữ liệu Đại lý & Tracking'}
             </h2>
             <p className="text-xs text-neutral-400 leading-relaxed">
               {isEn
-                ? `This tracking system is hidden from public visitors and locked exclusively to ${AUTHORIZED_ADMIN_EMAIL}. Collected data is synced directly to your Google Drive.`
-                : `Hệ thống Tracking đã được ẩn hoàn toàn khỏi khách truy cập và chỉ mở khóa duy nhất cho tài khoản Cloud Admin (${AUTHORIZED_ADMIN_EMAIL}). Dữ liệu thu thập được sẽ chuyển thẳng vào Google Drive của bạn.`}
+                ? 'Hold Shift and press K + Y + T + 1 + 2 + 3 on your keyboard to unlock Admin access.'
+                : 'Nhấn tổ hợp phím Shift + K + Y + T + 1 + 2 + 3 trên bàn phím để mở khóa quyền Admin ngay lập tức.'}
             </p>
+          </div>
+
+          {/* Visual Key Combination Badges */}
+          <div className="flex flex-wrap items-center justify-center gap-1.5 font-mono text-xs font-bold">
+            {['Shift', 'K', 'Y', 'T', '1', '2', '3'].map((k, idx) => (
+              <React.Fragment key={k}>
+                <kbd className="px-2.5 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white shadow-inner">
+                  {k}
+                </kbd>
+                {idx < 6 && <span className="text-neutral-500">+</span>}
+              </React.Fragment>
+            ))}
           </div>
 
           {authError && (
@@ -560,34 +623,32 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
             </div>
           )}
 
-          <div className="pt-1 flex justify-center">
-            <GoogleSignInButton
-              onClick={handleAdminGoogleSignIn}
-              disabled={isLoggingIn}
-              label={
-                isLoggingIn
-                  ? isEn
-                    ? 'Connecting Cloud Admin & Drive...'
-                    : 'Đang đồng bộ Admin & Google Drive...'
-                  : isEn
-                    ? 'Sign in with Google (Admin)'
-                    : 'Sign in with Google (Đồng bộ Admin & Drive)'
+          <form onSubmit={handleManualUnlockSubmit} className="flex items-center gap-2 pt-1">
+            <input
+              type="password"
+              value={manualKeyInput}
+              onChange={(e) => setManualKeyInput(e.target.value)}
+              placeholder={
+                isEn
+                  ? 'Or enter keycode KYT123 on mobile...'
+                  : 'Hoặc nhập nhanh KYT123 (nếu dùng điện thoại)...'
               }
+              className="flex-1 h-10 px-3.5 rounded-xl bg-black/60 border border-white/15 text-xs text-white font-mono focus:outline-none focus:border-[#E10600]"
             />
-          </div>
-
-          <p className="text-[11px] font-mono text-neutral-500">
-            {isEn
-              ? 'Secret shortcut: Ctrl + Shift + K or 5 clicks on footer ©'
-              : 'Phím tắt mở nhanh cho Admin: Ctrl + Shift + K hoặc bấm 5 lần vào dấu © ở chân trang'}
-          </p>
+            <button
+              type="submit"
+              className="h-10 px-4 rounded-xl bg-[#E10600] hover:bg-[#B80500] text-white text-xs font-bold cursor-pointer shrink-0"
+            >
+              {isEn ? 'Unlock' : 'Mở khóa'}
+            </button>
+          </form>
         </div>
       </div>
     );
   }
 
   // ==========================================================================
-  // UNLOCKED DASHBOARD (Strictly for boruto47001@gmail.com)
+  // UNLOCKED ADMIN DASHBOARD (Via Shift + K + Y + T + 1 + 2 + 3)
   // ==========================================================================
   return (
     <div
@@ -610,11 +671,10 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
             <div>
               <div className="flex items-center flex-wrap gap-2">
                 <span className="text-[10px] font-mono uppercase tracking-widest text-[#E10600] font-bold">
-                  KYT PRIVATE ADMIN · STEALTH TRACKING
+                  KYT ADMIN PORTAL · SHIFT+K+Y+T+1+2+3
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  HIDDEN FROM PUBLIC
+                  ADMIN UNLOCKED
                 </span>
               </div>
               <h2
@@ -622,25 +682,27 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                 className="text-lg sm:text-xl font-extrabold tracking-tight"
               >
                 {isEn
-                  ? 'Cloud Admin & Google Drive Tracking Center'
-                  : 'Trung tâm Tracking Cloud Admin & Google Drive'}
+                  ? 'Dealer Registrations (.CSV) & Tracking Admin Center'
+                  : 'Quản trị Hồ sơ Đăng ký Đại lý (.CSV) & Thống kê Website'}
               </h2>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 ml-auto">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
-              <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <KeyRound className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span className="text-emerald-200 font-mono truncate max-w-[180px]">
-                {currentUser?.email}
+                {currentUser?.email || 'Admin (Shift+KYT123)'}
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  logout();
+                  lockSecretAdmin();
+                  setSecretUnlocked(false);
+                  if (currentUser) logout();
                   onClose();
                 }}
-                title={isEn ? 'Sign out & lock' : 'Đăng xuất & Khóa'}
+                title={isEn ? 'Lock Admin Mode' : 'Khóa quyền Admin'}
                 className="text-neutral-400 hover:text-white ml-1 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -663,6 +725,23 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
           <div className="flex items-center flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => setActiveTab('dealers')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold tracking-wide transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'dealers'
+                  ? 'bg-[#E10600] text-white'
+                  : 'text-neutral-400 hover:text-white bg-white/[0.04]'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>
+                {isEn
+                  ? `Dealer Registrations .CSV (${dealerRecords.length})`
+                  : `Đăng ký Đại lý .CSV (${dealerRecords.length})`}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('overview')}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold tracking-wide transition-colors flex items-center gap-2 cursor-pointer ${
                 activeTab === 'overview'
@@ -671,7 +750,11 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>{isEn ? 'Analytics Overview' : 'Thống kê Chuyển đổi'}</span>
+              <span>
+                {isEn
+                  ? `Website Analytics (${allEvents.length})`
+                  : `Thống kê Website (${allEvents.length})`}
+              </span>
             </button>
 
             <button
@@ -686,8 +769,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
               <HardDrive className="w-3.5 h-3.5" />
               <span>
                 {isEn
-                  ? `Google Drive Sync (${driveFiles.length})`
-                  : `Google Drive của bạn (${driveFiles.length})`}
+                  ? `Google Drive (${driveFiles.length})`
+                  : `Google Drive (${driveFiles.length})`}
               </span>
             </button>
 
@@ -701,55 +784,33 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>{isEn ? 'GA4 / Meta / TikTok Pixels' : 'Mã Pixel (GA4 / FB / TikTok)'}</span>
+              <span>{isEn ? 'Marketing Pixels' : 'Mã Pixel'}</span>
             </button>
           </div>
 
           <div className="flex items-center flex-wrap gap-2">
-            {isSyncingCloud && (
-              <span className="text-[11px] font-mono text-neutral-400">
-                {isEn ? 'Syncing Firestore...' : 'Đang đồng bộ Cloud...'}
-              </span>
-            )}
-
             <button
               type="button"
-              onClick={handlePushNewReportToDrive}
-              disabled={isDriveSyncing}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={() => downloadDealerApplicationsCsv(dealerRecords)}
+              className="px-3.5 py-1.5 rounded-lg bg-[#E10600] hover:bg-[#B80500] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <HardDrive className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5" />
               <span>
-                {isDriveSyncing
-                  ? isEn
-                    ? 'Uploading to Drive...'
-                    : 'Đang chuyển vào Drive...'
-                  : isEn
-                    ? 'Send Data to Google Drive'
-                    : 'Chuyển thẳng vào Google Drive'}
+                {isEn
+                  ? `Download Dealers .CSV (${dealerRecords.length})`
+                  : `Tải CSV Đại lý (${dealerRecords.length})`}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={handleExportCsv}
+              onClick={handleExportTrackingCsv}
               disabled={allEvents.length === 0}
               className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-40 border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-[#E10600]" />
-              <span>{isEn ? 'Download CSV' : 'Tải CSV'}</span>
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isEn ? 'Tracking .CSV' : 'Tải CSV Tracking'}</span>
             </button>
-
-            {allEvents.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearEvents}
-                className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-red-500/20 border border-white/10 hover:border-red-500/40 text-xs text-neutral-400 hover:text-red-300 flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{isEn ? 'Reset' : 'Xóa bộ đếm'}</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -802,15 +863,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                       ? `Confirm deleting "${pendingConfirmation.file.name}" from Google Drive?`
                       : `Xác nhận xóa vĩnh viễn tệp "${pendingConfirmation.file.name}" khỏi Google Drive?`}
                 </p>
-                <p className="text-amber-100/80">
-                  {pendingConfirmation.type === 'overwrite'
-                    ? isEn
-                      ? `This will replace the file content with the latest ${allEvents.length} tracking records.`
-                      : `Thao tác này sẽ ghi đè nội dung tệp bằng ${allEvents.length} bản ghi sự kiện mới nhất.`
-                    : isEn
-                      ? 'This file will be permanently removed from your Google Drive.'
-                      : 'Tệp báo cáo này sẽ bị xóa khỏi thư mục Google Drive của bạn.'}
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -819,14 +871,14 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                 onClick={handleConfirmDriveMutation}
                 className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs cursor-pointer"
               >
-                {isEn ? 'Confirm' : 'Xác nhận thực hiện'}
+                {isEn ? 'Confirm' : 'Xác nhận'}
               </button>
               <button
                 type="button"
                 onClick={() => setPendingConfirmation(null)}
                 className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
               >
-                {isEn ? 'Cancel' : 'Hủy bỏ'}
+                {isEn ? 'Cancel' : 'Hủy'}
               </button>
             </div>
           </div>
@@ -834,68 +886,166 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-5 sm:p-8 overflow-y-auto space-y-6 flex-1">
-          {activeTab === 'overview' && (
-            <>
-              {/* Quick Google Drive Banner inside Overview */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#141A17] via-[#12151B] to-[#171316] border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* TAB 0: DEALER APPLICATIONS (.CSV) — ADMIN ONLY */}
+          {activeTab === 'dealers' && (
+            <div className="space-y-6">
+              <div className="p-5 rounded-2xl bg-[#141419] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">
-                    <HardDrive className="w-4 h-4" />
+                  <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#FF1E1A] font-bold">
+                    <FileSpreadsheet className="w-4 h-4" />
                     <span>
                       {isEn
-                        ? 'Direct Google Drive Pipeline Active'
-                        : 'Kết nối Chuyển thẳng Dữ liệu vào Google Drive'}
+                        ? 'DEALER APPLICATIONS DATABASE (.CSV FORMAT — ADMIN ONLY)'
+                        : 'DỮ LIỆU ĐĂNG KÝ LÀM ĐẠI LÝ (.CSV — CHỈ ADMIN MỚI THẤY & TẢI XUỐNG)'}
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-300">
-                    {driveToken
-                      ? isEn
-                        ? `Connected to ${AUTHORIZED_ADMIN_EMAIL}'s Google Drive (Folder: "KYT Vietnam Tracking Data").`
-                        : `Đã kết nối trực tiếp tới Google Drive của ${AUTHORIZED_ADMIN_EMAIL} (Thư mục: "KYT Vietnam Tracking Data").`
-                      : isEn
-                        ? 'Click "Connect Google Drive Session" to authorize direct file uploads for this browser session.'
-                        : 'Bấm "Kết nối phiên Google Drive" để đẩy tự động tệp báo cáo CSV thẳng vào Google Drive của bạn.'}
+                  <p className="text-xs text-neutral-400">
+                    {isEn
+                      ? 'Every dealer application submitted on the website is automatically formatted as UTF-8 .CSV for Excel and Google Sheets.'
+                      : 'Mọi hồ sơ đăng ký từ mục "Trở thành đại lý" đều được lưu trữ chuẩn .CSV (hỗ trợ tiếng Việt có dấu trên Excel & Google Sheets). Khách truy cập không thể xem dữ liệu này.'}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0">
-                  {!driveToken ? (
-                    <GoogleSignInButton
-                      onClick={handleAdminGoogleSignIn}
-                      disabled={isLoggingIn}
-                      label={
-                        isEn
-                          ? 'Connect Google Drive Session'
-                          : 'Kết nối phiên Google Drive'
-                      }
-                    />
-                  ) : (
-                    <>
-                      {driveFolderLink && (
-                        <a
-                          href={driveFolderLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                        >
-                          <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{isEn ? 'Open Drive Folder' : 'Mở thư mục Drive'}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('drive')}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold cursor-pointer"
-                      >
-                        {isEn ? 'Manage Drive Files' : 'Quản lý tệp trên Drive'}
-                      </button>
-                    </>
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => downloadDealerApplicationsCsv(dealerRecords)}
+                    className="px-4 py-2.5 rounded-xl bg-[#E10600] hover:bg-[#B80500] text-white text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>
+                      {isEn
+                        ? `Download .CSV File (${dealerRecords.length})`
+                        : `Tải xuống file .CSV (${dealerRecords.length} hồ sơ)`}
+                    </span>
+                  </button>
+
+                  {dealerRecords.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllDealerApplications();
+                        setDealerRecords([]);
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-white/[0.05] hover:bg-red-500/20 border border-white/10 hover:border-red-500/40 text-xs text-neutral-400 hover:text-red-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Clear All' : 'Xóa tất cả'}</span>
+                    </button>
                   )}
                 </div>
               </div>
 
-              {/* 4 KPI Summary Cards */}
+              {dealerRecords.length === 0 ? (
+                <div className="py-12 px-6 rounded-2xl bg-[#141419] border border-white/10 text-center space-y-2">
+                  <Store className="w-8 h-8 text-neutral-500 mx-auto" />
+                  <h3 className="text-sm font-bold text-white">
+                    {isEn
+                      ? 'No dealer applications submitted yet'
+                      : 'Chưa có hồ sơ đăng ký đại lý nào'}
+                  </h3>
+                  <p className="text-xs text-neutral-400 max-w-md mx-auto">
+                    {isEn
+                      ? 'When prospective partners submit the "Become an Official KYT Dealer" form on the website, their applications will appear here and can be downloaded as a .CSV file.'
+                      : 'Khi khách hàng gửi biểu mẫu tại mục "Trở thành Đại lý Chính hãng KYT", dữ liệu sẽ lập tức hiển thị tại đây để bạn kiểm tra và tải xuống file .CSV.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Table of Dealer Applications */}
+                  <div className="rounded-2xl bg-[#141419] border border-white/10 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-black/40 font-mono text-[11px] uppercase text-neutral-400">
+                            <th className="py-3 px-4">{isEn ? 'Time' : 'Thời gian'}</th>
+                            <th className="py-3 px-4">{isEn ? 'Store Name' : 'Tên cửa hàng'}</th>
+                            <th className="py-3 px-4">{isEn ? 'Contact' : 'Người liên hệ'}</th>
+                            <th className="py-3 px-4">{isEn ? 'Phone' : 'Số điện thoại'}</th>
+                            <th className="py-3 px-4">{isEn ? 'City / Province' : 'Tỉnh / Thành phố'}</th>
+                            <th className="py-3 px-4">{isEn ? 'Interested Lines' : 'Dòng nón quan tâm'}</th>
+                            <th className="py-3 px-4 text-right">{isEn ? 'Action' : 'Thao tác'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.06]">
+                          {dealerRecords.map((rec) => (
+                            <tr key={rec.applicationId} className="hover:bg-white/[0.03]">
+                              <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
+                                {new Date(rec.createdAtIso).toLocaleString(
+                                  isEn ? 'en-US' : 'vi-VN'
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-white">
+                                <div>{rec.storeName}</div>
+                                <div className="text-[11px] font-normal text-neutral-400">
+                                  {rec.businessScale}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-neutral-200">
+                                <div>{rec.contactName}</div>
+                                {rec.email !== 'N/A' && (
+                                  <div className="text-[11px] text-neutral-500 font-mono">
+                                    {rec.email}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-mono font-bold text-emerald-400 whitespace-nowrap">
+                                {rec.phone}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-[#FF1E1A]">{rec.city}</div>
+                                {rec.address !== 'N/A' && (
+                                  <div className="text-[11px] text-neutral-400 max-w-[200px] truncate">
+                                    {rec.address}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-neutral-300 max-w-[220px]">
+                                <div className="truncate">{rec.interestedLines.join(', ')}</div>
+                                {rec.notes && (
+                                  <div className="text-[11px] text-amber-300/90 truncate">
+                                    Ghi chú: {rec.notes}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    deleteDealerApplication(rec.applicationId);
+                                    setDealerRecords(loadDealerApplications());
+                                  }}
+                                  className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/25 text-red-300 transition-colors cursor-pointer"
+                                  title={isEn ? 'Delete record' : 'Xóa hồ sơ'}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Live .CSV Raw Data Preview */}
+                  <div className="p-4 rounded-2xl bg-[#0A0A0C] border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400">
+                      <span>RAW .CSV CONTENT PREVIEW (UTF-8)</span>
+                      <span>{dealerRecords.length} ROWS</span>
+                    </div>
+                    <pre className="text-[11px] font-mono text-emerald-300/90 overflow-x-auto max-h-36 p-3 rounded-xl bg-black border border-white/10">
+                      {buildDealerApplicationsCsv(dealerRecords)}
+                    </pre>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 1: ANALYTICS OVERVIEW */}
+          {activeTab === 'overview' && (
+            <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
@@ -938,14 +1088,14 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>{isEn ? '3D Helmet Explorations' : 'Xem dòng nón 3D'}</span>
+                    <span>{isEn ? 'Helmet & Size Checks' : 'Xem nón & Đo size'}</span>
                     <Sparkles className="w-4 h-4 text-amber-400" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-amber-400">
                     {stats.helmetViews}
                   </p>
                   <p className="text-[11px] text-neutral-500">
-                    TT-REVO · TTR-JET · TIGER JET
+                    3D Coverflow + Bảng đo size 1:1
                   </p>
                 </div>
               </div>
@@ -962,9 +1112,15 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                           : 'Top Đại lý được khách bấm nhiều nhất'}
                       </span>
                     </h3>
-                    <span className="text-[11px] font-mono text-neutral-400">
-                      {isEn ? 'Maps + Details' : 'Chỉ đường + Chi tiết'}
-                    </span>
+                    {allEvents.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearEvents}
+                        className="text-[11px] font-mono text-neutral-400 hover:text-red-400 cursor-pointer"
+                      >
+                        {isEn ? 'Reset log' : 'Xóa bộ đếm'}
+                      </button>
+                    )}
                   </div>
 
                   {stats.topStores.length > 0 ? (
@@ -1008,8 +1164,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                   <div className="space-y-3">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                       {isEn
-                        ? 'Most Viewed Helmet Models & Graphics'
-                        : 'Dòng nón & Tem nón được xem nhiều nhất'}
+                        ? 'Most Viewed Helmet Models & Size Checks'
+                        : 'Dòng nón & Bảng size được xem nhiều nhất'}
                     </h3>
                     {stats.topHelmets.length > 0 ? (
                       <div className="space-y-2.5">
@@ -1033,33 +1189,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                     ) : (
                       <p className="text-xs text-neutral-500 py-2">
                         {isEn ? 'No helmet views recorded yet.' : 'Chưa có dữ liệu xem nón.'}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-white/10 space-y-2.5">
-                    <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-400">
-                      {isEn
-                        ? 'Most Filtered Provinces / Cities'
-                        : 'Tỉnh / Thành phố được lọc tìm nhiều nhất'}
-                    </h4>
-                    {stats.topProvinces.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {stats.topProvinces.map((item) => (
-                          <span
-                            key={item.province}
-                            className="px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-xs text-white font-medium"
-                          >
-                            {item.province}:{' '}
-                            <strong className="text-[#FF1E1A] font-mono">{item.count}</strong>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-neutral-500">
-                        {isEn
-                          ? 'No province filter selections yet.'
-                          : 'Chưa có lượt chọn bộ lọc Tỉnh / Thành phố.'}
                       </p>
                     )}
                   </div>
@@ -1113,14 +1242,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                           <span className="uppercase">{evt.deviceType}</span>
                           <span>·</span>
                           <span>{evt.lang}</span>
-                          {evt.syncedToCloud && (
-                            <span
-                              title="Synced to Firestore"
-                              className="text-emerald-400 font-bold"
-                            >
-                              ● Cloud
-                            </span>
-                          )}
                         </div>
                       </div>
                     );
@@ -1145,8 +1266,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                   </div>
                   <p className="text-xs text-neutral-400">
                     {isEn
-                      ? `All exported tracking spreadsheets are saved directly inside the "KYT Vietnam Tracking Data" folder in ${AUTHORIZED_ADMIN_EMAIL}'s Google Drive.`
-                      : `Toàn bộ dữ liệu tracking thu thập trên website được đóng gói thành bảng tính CSV (mở trực tiếp bằng Google Sheets) trong thư mục "KYT Vietnam Tracking Data" trên Google Drive của ${AUTHORIZED_ADMIN_EMAIL}.`}
+                      ? `Optional: Connect Google Drive to push CSV reports directly into your Drive folder.`
+                      : `Tùy chọn nâng cao: Kết nối Google Drive để đẩy tự động tệp CSV vào thư mục trên Drive của bạn.`}
                   </p>
                 </div>
 
@@ -1157,8 +1278,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                       disabled={isLoggingIn}
                       label={
                         isEn
-                          ? 'Sign in with Google to Sync Drive'
-                          : 'Sign in with Google (Kết nối Google Drive)'
+                          ? 'Connect Google Drive'
+                          : 'Kết nối Google Drive'
                       }
                     />
                   ) : (
@@ -1171,19 +1292,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>{isEn ? 'Refresh' : 'Làm mới'}</span>
                       </button>
-
-                      {driveFolderLink && (
-                        <a
-                          href={driveFolderLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-semibold flex items-center gap-1.5"
-                        >
-                          <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{isEn ? 'Open Drive Folder' : 'Mở thư mục trên Drive'}</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
 
                       <button
                         type="button"
@@ -1198,113 +1306,13 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                               ? 'Uploading...'
                               : 'Đang tải lên Drive...'
                             : isEn
-                              ? 'Create New Report in Drive'
-                              : 'Tạo bản ghi mới vào Google Drive'}
+                              ? 'Upload CSV to Drive'
+                              : 'Tải CSV lên Google Drive'}
                         </span>
                       </button>
                     </>
                   )}
                 </div>
-              </div>
-
-              {/* List of Files inside Google Drive */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-[#141419] border border-white/10 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-mono uppercase tracking-wider text-neutral-300 font-bold">
-                    {isEn
-                      ? 'Tracking Report Files in Your Google Drive'
-                      : 'Danh sách Tệp dữ liệu Tracking trong Google Drive của bạn'}
-                  </h4>
-                  <span className="text-xs font-mono text-neutral-500">
-                    {driveFiles.length} {isEn ? 'files' : 'tệp'}
-                  </span>
-                </div>
-
-                {!driveToken ? (
-                  <p className="text-xs text-neutral-400 py-8 text-center">
-                    {isEn
-                      ? 'Connect your Google Drive session above to view and manage your tracking files.'
-                      : 'Vui lòng bấm nút "Sign in with Google" phía trên để kết nối phiên làm việc với Google Drive.'}
-                  </p>
-                ) : driveFiles.length === 0 ? (
-                  <div className="py-8 text-center space-y-3">
-                    <p className="text-xs text-neutral-400">
-                      {isEn
-                        ? 'No tracking files in your Google Drive folder yet.'
-                        : 'Chưa có tệp báo cáo nào trong thư mục Google Drive của bạn.'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handlePushNewReportToDrive}
-                      disabled={isDriveSyncing}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold inline-flex items-center gap-2 cursor-pointer"
-                    >
-                      <HardDrive className="w-4 h-4" />
-                      <span>
-                        {isEn
-                          ? 'Send Current Data to Google Drive Now'
-                          : 'Chuyển thẳng dữ liệu hiện tại vào Google Drive ngay'}
-                      </span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-white/[0.08]">
-                    {driveFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-bold text-white truncate">{file.name}</p>
-                            <p className="text-[11px] text-neutral-400 font-mono">
-                              {isEn ? 'Updated: ' : 'Cập nhật: '}
-                              {new Date(file.modifiedTime).toLocaleString(
-                                isEn ? 'en-US' : 'vi-VN'
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center flex-wrap gap-2 shrink-0">
-                          {file.webViewLink && (
-                            <a
-                              href={file.webViewLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold flex items-center gap-1"
-                            >
-                              <span>{isEn ? 'Open in Drive' : 'Mở trên Drive'}</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPendingConfirmation({ type: 'overwrite', file })
-                            }
-                            className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-neutral-200 font-semibold cursor-pointer"
-                          >
-                            {isEn ? 'Update with Latest Data' : 'Cập nhật dữ liệu mới nhất'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPendingConfirmation({ type: 'delete', file })
-                            }
-                            className="px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/25 border border-red-500/25 text-red-300 cursor-pointer"
-                            title={isEn ? 'Delete from Drive' : 'Xóa khỏi Drive'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1319,11 +1327,6 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                       ? 'External Marketing Pixels & Tag Manager'
                       : 'Tích hợp Mã Tracking Quảng cáo (GA4, GTM, Facebook Pixel, TikTok)'}
                   </h3>
-                  <p className="text-xs text-neutral-400">
-                    {isEn
-                      ? 'Enter your tracking IDs below. Every dealer click, Google Maps direction click, and Shopee/TikTok click will automatically fire events to these platforms.'
-                      : 'Nhập mã ID của bạn vào bên dưới. Mọi lượt khách bấm Chỉ đường Google Maps, mở xem đại lý, xem nón 3D hoặc bấm mua Shopee / TikTok sẽ tự động bắn sự kiện (Event) về trình quản lý quảng cáo.'}
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

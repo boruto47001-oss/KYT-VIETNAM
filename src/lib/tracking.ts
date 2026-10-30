@@ -35,7 +35,9 @@ export type TrackingEventType =
   | 'province_filter'
   | 'store_search'
   | 'ecommerce_click'
-  | 'language_switch';
+  | 'language_switch'
+  | 'size_guide_interact'
+  | 'dealer_registration';
 
 export interface TrackingEventRecord {
   eventId: string;
@@ -781,3 +783,195 @@ export async function deleteDriveTrackingFile(
     throw new Error(`Không thể xóa tệp trên Google Drive (HTTP ${res.status}).`);
   }
 }
+
+// ============================================================================
+// ADMIN ACCESS VIA SECRET KEY COMBINATION: SHIFT + K + Y + T + 1 + 2 + 3
+// ============================================================================
+const ADMIN_SESSION_STORAGE_KEY = 'kyt_vn_admin_unlocked_shift_kyt123';
+
+export function isSecretAdminUnlocked(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function unlockSecretAdmin(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, 'true');
+  } catch {
+    // Ignore storage error
+  }
+  window.dispatchEvent(new CustomEvent('kyt-admin-auth-changed', { detail: { unlocked: true } }));
+}
+
+export function lockSecretAdmin(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore storage error
+  }
+  window.dispatchEvent(new CustomEvent('kyt-admin-auth-changed', { detail: { unlocked: false } }));
+}
+
+// ============================================================================
+// DEALER APPLICATIONS (.CSV FORMAT STORAGE — VISIBLE & DOWNLOADABLE BY ADMIN ONLY)
+// ============================================================================
+export interface DealerApplicationRecord {
+  applicationId: string;
+  createdAtIso: string;
+  storeName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  city: string;
+  address: string;
+  interestedLines: string[];
+  businessScale: string;
+  notes: string;
+}
+
+const LOCAL_DEALER_APPLICATIONS_KEY = 'kyt_vn_dealer_applications_v1';
+const LOCAL_DEALER_CSV_CACHE_KEY = 'kyt_vn_dealer_applications_csv_v1';
+
+function escapeCsvCell(val: string): string {
+  const cleaned = String(val ?? '').replace(/\r?\n/g, ' ').trim();
+  return `"${cleaned.replace(/"/g, '""')}"`;
+}
+
+export function buildDealerApplicationsCsv(records: DealerApplicationRecord[]): string {
+  const headers = [
+    'Mã Đăng Ký (ID)',
+    'Thời Gian Đăng Ký',
+    'Tên Cửa Hàng / Đại Lý',
+    'Người Liên Hệ',
+    'Số Điện Thoại',
+    'Email',
+    'Tỉnh / Thành Phố',
+    'Địa Chỉ Kinh Doanh',
+    'Dòng Nón Quan Tâm',
+    'Quy Mô Dự Kiến',
+    'Ghi Chú',
+  ];
+
+  const rows = records.map((r) => [
+    escapeCsvCell(r.applicationId),
+    escapeCsvCell(r.createdAtIso),
+    escapeCsvCell(r.storeName),
+    escapeCsvCell(r.contactName),
+    escapeCsvCell(r.phone),
+    escapeCsvCell(r.email),
+    escapeCsvCell(r.city),
+    escapeCsvCell(r.address),
+    escapeCsvCell(r.interestedLines.join(' | ')),
+    escapeCsvCell(r.businessScale),
+    escapeCsvCell(r.notes),
+  ]);
+
+  return '\uFEFF' + [headers.map(escapeCsvCell).join(','), ...rows.map((row) => row.join(','))].join('\n');
+}
+
+export function loadDealerApplications(): DealerApplicationRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_DEALER_APPLICATIONS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDealerApplications(records: DealerApplicationRecord[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_DEALER_APPLICATIONS_KEY, JSON.stringify(records));
+    // Also persist raw .CSV formatted dataset directly in storage as requested
+    const csvSnapshot = buildDealerApplicationsCsv(records);
+    localStorage.setItem(LOCAL_DEALER_CSV_CACHE_KEY, csvSnapshot);
+    window.dispatchEvent(new CustomEvent('kyt-dealer-applications-updated'));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+export function submitDealerApplication(input: {
+  storeName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  city: string;
+  address: string;
+  interestedLines: string[];
+  businessScale: string;
+  notes: string;
+  lang: Language;
+}): DealerApplicationRecord {
+  const nowIso = new Date().toISOString();
+  const applicationId = sanitizeId(
+    `dlr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    `dlr_${Date.now()}`
+  );
+
+  const newRecord: DealerApplicationRecord = {
+    applicationId,
+    createdAtIso: nowIso,
+    storeName: sanitizeText(input.storeName, 150, 'Chưa đặt tên'),
+    contactName: sanitizeText(input.contactName, 120, 'N/A'),
+    phone: sanitizeText(input.phone, 40, 'N/A'),
+    email: sanitizeText(input.email, 120, 'N/A'),
+    city: sanitizeText(input.city, 100, 'N/A'),
+    address: sanitizeText(input.address, 250, 'N/A'),
+    interestedLines:
+      input.interestedLines.length > 0 ? input.interestedLines : ['Tất cả dòng nón KYT'],
+    businessScale: sanitizeText(input.businessScale, 100, 'Đại lý tiêu chuẩn'),
+    notes: sanitizeText(input.notes, 400, ''),
+  };
+
+  const current = loadDealerApplications();
+  const updated = [newRecord, ...current];
+  saveDealerApplications(updated);
+
+  trackKytEvent({
+    eventType: 'dealer_registration',
+    targetId: applicationId,
+    targetLabel: `${newRecord.storeName} (${newRecord.city})`,
+    category: newRecord.city,
+    lang: input.lang,
+  });
+
+  return newRecord;
+}
+
+export function deleteDealerApplication(applicationId: string): void {
+  const current = loadDealerApplications();
+  const filtered = current.filter((item) => item.applicationId !== applicationId);
+  saveDealerApplications(filtered);
+}
+
+export function clearAllDealerApplications(): void {
+  saveDealerApplications([]);
+}
+
+export function downloadDealerApplicationsCsv(records?: DealerApplicationRecord[]): void {
+  const list = records ?? loadDealerApplications();
+  const csvContent = buildDealerApplicationsCsv(list);
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute(
+    'download',
+    `kyt-vietnam-danh-sach-dai-ly-dang-ky-${new Date().toISOString().slice(0, 10)}.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+

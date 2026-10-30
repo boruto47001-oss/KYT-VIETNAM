@@ -217,6 +217,9 @@ export interface OnlineChannel {
   badge: string;
 }
 
+export const SHOPEE_OFFICIAL_URL =
+  'https://shopee.vn/universal-link/kytvietnam?deep_and_web=1&smtt=9&utm_campaign=s1224932733_ss_vn_webs_websitetrackinglink&utm_medium=seller&utm_source=website';
+
 export const OFFICIAL_ONLINE_CHANNELS: OnlineChannel[] = [
   {
     id: 'shopee',
@@ -224,7 +227,7 @@ export const OFFICIAL_ONLINE_CHANNELS: OnlineChannel[] = [
     handle: 'shopee.vn/kytvietnam',
     description: 'Gian hàng trực tuyến chính hãng KYT Vietnam trên Shopee với đầy đủ các dòng nón và phụ kiện.',
     descriptionEn: 'KYT Vietnam official flagship store on Shopee with full range of helmets and genuine accessories.',
-    url: 'https://shopee.vn/kytvietnam?entryPoint=ShopBySearch&searchKeyword=kyt',
+    url: SHOPEE_OFFICIAL_URL,
     badge: 'OFFICIAL SHOPEE STORE',
   },
   {
@@ -547,3 +550,226 @@ export const INITIAL_STORE_LOCATIONS: StoreLocation[] = RAW_STORES.map((item, id
   googleMapsUrl: getStoreMapsUrl(item.address),
   interiorPreset: PRESETS[idx % PRESETS.length],
 }));
+
+export interface HelmetSizeRow {
+  size: string;
+  minCm: number;
+  maxCm: number;
+  label: string;
+}
+
+export interface HelmetSizeModel {
+  id: string;
+  name: string;
+  category: string;
+  categoryEn: string;
+  sizes: HelmetSizeRow[];
+  noteVie?: string;
+  noteEng?: string;
+}
+
+export const HELMET_SIZE_GUIDES: HelmetSizeModel[] = [
+  {
+    id: 'voodoo',
+    name: 'VOODOO',
+    category: 'Open-Face / 3/4',
+    categoryEn: 'Open-Face / 3/4',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 58, label: '56 - 58 cm' },
+      { size: 'L', minCm: 57, maxCm: 59, label: '57 - 59 cm' },
+      { size: 'XL', minCm: 58, maxCm: 60, label: '58 - 60 cm' },
+      { size: 'XXL', minCm: 59, maxCm: 61, label: '59 - 61 cm' },
+    ],
+  },
+  {
+    id: 'cougar',
+    name: 'COUGAR',
+    category: 'Open-Face / 3/4',
+    categoryEn: 'Open-Face / 3/4',
+    sizes: [
+      { size: 'M', minCm: 57, maxCm: 57, label: '57 cm' },
+      { size: 'L', minCm: 58, maxCm: 58, label: '58 cm' },
+      { size: 'XL', minCm: 59, maxCm: 59, label: '59 cm' },
+      { size: 'XXL', minCm: 60, maxCm: 60, label: '60 cm' },
+    ],
+  },
+  {
+    id: 'tiger-jet',
+    name: 'TIGER JET',
+    category: 'Nón 1/2 Có Kính',
+    categoryEn: 'Half-Face with Visor',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 57, label: '56 - 57 cm' },
+      { size: 'L', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'XL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+      { size: 'XXL', minCm: 59, maxCm: 60, label: '59 - 60 cm' },
+    ],
+  },
+  {
+    id: 'nf-r',
+    name: 'NF-R',
+    category: 'Full-Face Sport Touring',
+    categoryEn: 'Full-Face Sport Touring',
+    sizes: [
+      { size: 'M', minCm: 55, maxCm: 55, label: '55 cm' },
+      { size: 'L', minCm: 56, maxCm: 56, label: '56 cm' },
+      { size: 'XL', minCm: 57, maxCm: 57, label: '57 cm' },
+      { size: 'XXL', minCm: 58, maxCm: 58, label: '58 cm' },
+    ],
+  },
+  {
+    id: 'falcon',
+    name: 'FALCON',
+    category: 'Full-Face Sport',
+    categoryEn: 'Full-Face Sport',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 57, label: '56 - 57 cm' },
+      { size: 'L', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'XL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+      { size: 'XXL', minCm: 59, maxCm: 60, label: '59 - 60 cm' },
+    ],
+  },
+  {
+    id: 'venom-open',
+    name: 'VENOM OPEN',
+    category: 'Open-Face / 3/4 2 Kính',
+    categoryEn: 'Open-Face Dual Visor',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 56, label: '56 cm' },
+      { size: 'L', minCm: 56, maxCm: 57, label: '56 - 57 cm' },
+      { size: 'XL', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'XXL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+    ],
+  },
+  {
+    id: 'nfj',
+    name: 'NFJ',
+    category: 'Open-Face / 3/4 Cao Cấp',
+    categoryEn: 'Premium Open-Face',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 56, label: '56 cm' },
+      { size: 'L', minCm: 56, maxCm: 57, label: '56 - 57 cm' },
+      { size: 'XL', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'XXL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+    ],
+  },
+  {
+    id: 'd-city',
+    name: 'D-CITY',
+    category: 'Urban Jet Helmet',
+    categoryEn: 'Urban Jet Helmet',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 56, label: '56 cm' },
+      { size: 'L', minCm: 57, maxCm: 57, label: '57 cm' },
+      { size: 'XL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+      { size: 'XXL', minCm: 59, maxCm: 60, label: '59 - 60 cm' },
+    ],
+  },
+  {
+    id: 'venom-open-mini',
+    name: 'VENOM OPEN MINI',
+    category: 'Open-Face / 3/4 Form Nhỏ',
+    categoryEn: 'Compact Open-Face',
+    sizes: [
+      { size: 'M', minCm: 56, maxCm: 57, label: '56 - 57 cm' },
+      { size: 'L', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'XL', minCm: 58, maxCm: 59, label: '58 - 59 cm' },
+      { size: 'XXL', minCm: 59, maxCm: 60, label: '59 - 60 cm' },
+    ],
+  },
+  {
+    id: 'tt-revo',
+    name: 'TT-REVO',
+    category: 'Full-Face Aerodynamic Sport',
+    categoryEn: 'Full-Face Aerodynamic Sport',
+    sizes: [
+      { size: 'S', minCm: 55, maxCm: 56, label: '55 - 56 cm' },
+      { size: 'M', minCm: 56, maxCm: 58, label: '56 - 58 cm' },
+      { size: 'L', minCm: 58, maxCm: 60, label: '58 - 60 cm' },
+      { size: 'XL', minCm: 60, maxCm: 62, label: '60 - 62 cm' },
+    ],
+    noteVie:
+      'Lưu ý: thời gian đầu đội sẽ hơi chật nhưng sau vài lần sử dụng, phần đệm sẽ mềm và ôm thoải mái gương mặt.',
+    noteEng:
+      'Note: Initial fit will feel slightly snug, but after a few uses the liner pads will soften and contour comfortably to your face.',
+  },
+  {
+    id: 'ttr-jet',
+    name: 'TTR-JET',
+    category: 'Aerodynamic Open-Face 2 Kính',
+    categoryEn: 'Aerodynamic Dual-Visor Open-Face',
+    sizes: [
+      { size: 'M', minCm: 57, maxCm: 58, label: '57 - 58 cm' },
+      { size: 'L', minCm: 58, maxCm: 60, label: '58 - 60 cm' },
+      { size: 'XL', minCm: 60, maxCm: 62, label: '60 - 62 cm' },
+      { size: '2XL', minCm: 62, maxCm: 63, label: '62 - 63 cm' },
+    ],
+  },
+];
+
+export const VIETNAM_PROVINCES: string[] = [
+  'TP. Hồ Chí Minh',
+  'Hà Nội',
+  'Đà Nẵng',
+  'Bình Dương',
+  'Đồng Nai',
+  'Cần Thơ',
+  'Hải Phòng',
+  'Khánh Hòa',
+  'Lâm Đồng',
+  'Bà Rịa - Vũng Tàu',
+  'An Giang',
+  'Bắc Giang',
+  'Bắc Kạn',
+  'Bạc Liêu',
+  'Bắc Ninh',
+  'Bến Tre',
+  'Bình Định',
+  'Bình Phước',
+  'Bình Thuận',
+  'Cà Mau',
+  'Cao Bằng',
+  'Đắk Lắk',
+  'Đắk Nông',
+  'Điện Biên',
+  'Đồng Tháp',
+  'Gia Lai',
+  'Hà Giang',
+  'Hà Nam',
+  'Hà Tĩnh',
+  'Hải Dương',
+  'Hậu Giang',
+  'Hòa Bình',
+  'Hưng Yên',
+  'Kiên Giang',
+  'Kon Tum',
+  'Lai Châu',
+  'Lạng Sơn',
+  'Lào Cai',
+  'Long An',
+  'Nam Định',
+  'Nghệ An',
+  'Ninh Bình',
+  'Ninh Thuận',
+  'Phú Thọ',
+  'Phú Yên',
+  'Quảng Bình',
+  'Quảng Nam',
+  'Quảng Ngãi',
+  'Quảng Ninh',
+  'Quảng Trị',
+  'Sóc Trăng',
+  'Sơn La',
+  'Tây Ninh',
+  'Thái Bình',
+  'Thái Nguyên',
+  'Thanh Hóa',
+  'Thừa Thiên Huế',
+  'Tiền Giang',
+  'Trà Vinh',
+  'Tuyên Quang',
+  'Vĩnh Long',
+  'Vĩnh Phúc',
+  'Yên Bái',
+];
+

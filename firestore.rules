@@ -83,7 +83,9 @@ service cloud.firestore {
           'province_filter',
           'store_search',
           'ecommerce_click',
-          'language_switch'
+          'language_switch',
+          'size_guide_interact',
+          'dealer_registration'
         ] &&
         data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
         data.targetLabel is string && data.targetLabel.size() >= 1 && data.targetLabel.size() <= 200 &&
