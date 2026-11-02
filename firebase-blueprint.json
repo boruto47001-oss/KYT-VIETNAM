@@ -196,6 +196,100 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "DealerApplication": {
+      "title": "DealerApplication",
+      "description": "Official KYT Vietnam dealer partnership registration record.",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "Unique identifier for the dealer registration record.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated user or admin syncing the dealer record.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "storeName": {
+          "type": "string",
+          "description": "Store or company name registering as a KYT dealer.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "contactName": {
+          "type": "string",
+          "description": "Full name of the contact person.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone or Zalo number.",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional contact email address.",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "city": {
+          "type": "string",
+          "description": "Province or city selected in the dealer form.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "address": {
+          "type": "string",
+          "description": "Street address of the store.",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "interestedLines": {
+          "type": "string",
+          "description": "Comma/pipe-separated product lines of interest.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "businessScale": {
+          "type": "string",
+          "description": "Store business format or scale.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes from the applicant.",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the dealer application was synced."
+        }
+      },
+      "required": [
+        "applicationId",
+        "ownerId",
+        "storeName",
+        "contactName",
+        "phone",
+        "email",
+        "city",
+        "address",
+        "interestedLines",
+        "businessScale",
+        "notes",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -210,6 +304,10 @@
     "/tracking_configs/{configId}": {
       "schema": { "$ref": "#/entities/TrackingConfig" },
       "description": "Stores marketing pixel IDs (GA4, GTM, Meta Pixel, TikTok Pixel) managed by administrators."
+    },
+    "/dealer_applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/DealerApplication" },
+      "description": "Stores official KYT Vietnam dealer registration applications."
     }
   }
 }

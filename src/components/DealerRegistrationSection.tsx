@@ -16,6 +16,7 @@ import { VIETNAM_PROVINCES, Language } from '../data/kytData';
 import {
   submitDealerApplication,
   loadDealerApplications,
+  syncDealerApplicationsWithServerAndCloud,
   downloadDealerApplicationsCsv,
   DealerApplicationRecord,
 } from '../lib/tracking';
@@ -88,6 +89,15 @@ export const DealerRegistrationSection: React.FC<DealerRegistrationSectionProps>
   const [adminDealerList, setAdminDealerList] = useState<DealerApplicationRecord[]>([]);
 
   const cityComboRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync local + server + cloud dealer records on mount and when Admin is unlocked
+  useEffect(() => {
+    syncDealerApplicationsWithServerAndCloud().then((merged) => {
+      if (isAdminUnlocked) {
+        setAdminDealerList(merged);
+      }
+    });
+  }, [isAdminUnlocked]);
 
   // Sync dealer list count strictly when Admin is unlocked
   useEffect(() => {

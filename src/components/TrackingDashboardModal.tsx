@@ -56,10 +56,14 @@ import {
   unlockSecretAdmin,
   lockSecretAdmin,
   loadDealerApplications,
+  syncDealerApplicationsWithServerAndCloud,
+  submitDealerApplication,
   deleteDealerApplication,
   clearAllDealerApplications,
   buildDealerApplicationsCsv,
   downloadDealerApplicationsCsv,
+  runStorageSelfTest,
+  StorageSelfTestReport,
   MAX_PIXEL_ID_LENGTH,
 } from '../lib/tracking';
 import { Language } from '../data/kytData';
@@ -170,6 +174,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [isRunningSelfTest, setIsRunningSelfTest] = useState<boolean>(false);
+  const [selfTestReport, setSelfTestReport] = useState<StorageSelfTestReport | null>(null);
 
   // Admin is authorized if unlocked via Shift+K+Y+T+1+2+3 OR signed in with authorized admin email
   const isAuthorizedAdmin = secretUnlocked || isAuthorizedAdminUser(currentUser);
@@ -251,14 +257,18 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     });
   }, [isOpen, currentUser, refreshDriveState]);
 
-  // Subscribe to Firestore cloud events when signed in as boruto47001@gmail.com
+  // Subscribe to Server + Cloud events whenever Admin modal is open and unlocked
   useEffect(() => {
-    if (!isOpen || !isAuthorizedAdminUser(currentUser)) return;
+    if (!isOpen || !isAuthorizedAdmin) return;
+    syncDealerApplicationsWithServerAndCloud().then((merged) => {
+      setDealerRecords(merged);
+    });
     const unsub = subscribeToCloudEvents((events) => {
       setCloudEvents(events);
+      setLocalEvents(loadLocalEvents());
     });
     return () => unsub();
-  }, [isOpen, currentUser]);
+  }, [isOpen, isAuthorizedAdmin, currentUser]);
 
   // Listen to local tracking & dealer application updates
   useEffect(() => {
@@ -559,6 +569,37 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     }
   };
 
+  const handleRunSelfTest = async () => {
+    setIsRunningSelfTest(true);
+    try {
+      const report = await runStorageSelfTest();
+      setSelfTestReport(report);
+      setDealerRecords(loadDealerApplications());
+      setLocalEvents(loadLocalEvents());
+    } finally {
+      setIsRunningSelfTest(false);
+    }
+  };
+
+  const handleCreateSampleDealerRecord = () => {
+    submitDealerApplication({
+      storeName: 'KYT Moto Center Sài Gòn (Hồ sơ Test)',
+      contactName: 'Nguyễn Hoàng KYT',
+      phone: '0909888999',
+      email: 'dealer.test@kytvietnam.vn',
+      city: 'TP. Hồ Chí Minh',
+      address: '128 Nguyễn Thị Minh Khai, Quận 3, TP. Hồ Chí Minh',
+      interestedLines: [
+        'Full-Face (TT-REVO, NF-R, FALCON)',
+        'Open-Face 3/4 (TTR-JET, VENOM OPEN, NFJ, COUGAR, VOODOO)',
+      ],
+      businessScale: 'Showroom / Cửa hàng chuyên doanh',
+      notes: 'Hồ sơ mẫu tạo từ bảng Admin để kiểm tra lưu trữ .CSV đa tầng',
+      lang,
+    });
+    setDealerRecords(loadDealerApplications());
+  };
+
   // ==========================================================================
   // LOCKED STATE: UNLOCK VIA SHIFT + K + Y + T + 1 + 2 + 3
   // ==========================================================================
@@ -791,6 +832,24 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
           <div className="flex items-center flex-wrap gap-2">
             <button
               type="button"
+              onClick={handleRunSelfTest}
+              disabled={isRunningSelfTest}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRunningSelfTest ? 'animate-spin' : ''}`} />
+              <span>
+                {isRunningSelfTest
+                  ? isEn
+                    ? 'Testing...'
+                    : 'Đang kiểm tra...'
+                  : isEn
+                    ? 'Verify Storage (Self-Test)'
+                    : 'Kiểm tra Lưu trữ (Self-Test)'}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => downloadDealerApplicationsCsv(dealerRecords)}
               className="px-3.5 py-1.5 rounded-lg bg-[#E10600] hover:bg-[#B80500] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
@@ -886,6 +945,66 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-5 sm:p-8 overflow-y-auto space-y-6 flex-1">
+          {/* Interactive Self-Test Diagnostic Report Banner */}
+          {selfTestReport && (
+            <div className="p-5 rounded-2xl bg-[#111916] border border-emerald-500/40 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">
+                      {selfTestReport.overallPassed
+                        ? isEn
+                          ? `ALL 4 STORAGE & TRACKING CHECKS PASSED (${selfTestReport.totalDurationMs}ms)`
+                          : `KIỂM TRA ĐA TẦNG THÀNH CÔNG 100% (${selfTestReport.totalDurationMs}ms)`
+                        : isEn
+                          ? 'STORAGE DIAGNOSTIC REPORT'
+                          : 'BÁO CÁO KIỂM TRA HỆ THỐNG LƯU TRỮ'}
+                    </div>
+                    <p className="text-xs text-neutral-300">
+                      {isEn
+                        ? 'Verified end-to-end write/read persistence across Browser Cache, Server Disk (.JSON/.CSV), and Cloud Sync.'
+                        : 'Đã kiểm tra ghi & đọc đối chiếu thực tế trên Trình duyệt, Ổ đĩa Server (.JSON/.CSV) và Đồng bộ Cloud.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelfTestReport(null)}
+                  className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-neutral-200 cursor-pointer"
+                >
+                  {isEn ? 'Close Report' : 'Đóng báo cáo'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {selfTestReport.steps.map((step) => (
+                  <div
+                    key={step.stepId}
+                    className={`p-3.5 rounded-xl border text-xs space-y-1 ${
+                      step.passed
+                        ? 'bg-black/40 border-emerald-500/30 text-neutral-200'
+                        : 'bg-red-950/30 border-red-500/40 text-red-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 font-bold">
+                      <span className={step.passed ? 'text-emerald-300' : 'text-red-300'}>
+                        {step.passed ? '✓ PASS' : '✕ FAIL'} ·{' '}
+                        {isEn ? step.titleEng : step.titleVie}
+                      </span>
+                      <span className="font-mono text-[11px] text-neutral-400">
+                        {step.latencyMs}ms
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      {isEn ? step.detailEng : step.detailVie}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* TAB 0: DEALER APPLICATIONS (.CSV) — ADMIN ONLY */}
           {activeTab === 'dealers' && (
             <div className="space-y-6">
@@ -896,17 +1015,26 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                     <span>
                       {isEn
                         ? 'DEALER APPLICATIONS DATABASE (.CSV FORMAT — ADMIN ONLY)'
-                        : 'DỮ LIỆU ĐĂNG KÝ LÀM ĐẠI LÝ (.CSV — CHỈ ADMIN MỚI THẤY & TẢI XUỐNG)'}
+                        : 'DỮ LIỆU ĐĂNG KÝ LÀM ĐẠI LÝ (.CSV — ĐỒNG BỘ ĐA TẦNG SERVER + LOCAL + CLOUD)'}
                     </span>
                   </div>
                   <p className="text-xs text-neutral-400">
                     {isEn
-                      ? 'Every dealer application submitted on the website is automatically formatted as UTF-8 .CSV for Excel and Google Sheets.'
-                      : 'Mọi hồ sơ đăng ký từ mục "Trở thành đại lý" đều được lưu trữ chuẩn .CSV (hỗ trợ tiếng Việt có dấu trên Excel & Google Sheets). Khách truy cập không thể xem dữ liệu này.'}
+                      ? 'Every dealer application submitted on the website is persisted to Server Disk (.JSON & .CSV), LocalStorage, and Cloud.'
+                      : 'Mọi hồ sơ đăng ký từ mục "Trở thành đại lý" đều được lưu đồng thời vào ổ đĩa Server (.JSON & .CSV), trình duyệt và Cloud. Khách truy cập không thể xem dữ liệu này.'}
                   </p>
                 </div>
 
                 <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCreateSampleDealerRecord}
+                    className="px-3.5 py-2.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isEn ? '+ Add Sample Record' : '+ Tạo 1 Hồ sơ Mẫu để Test'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => downloadDealerApplicationsCsv(dealerRecords)}

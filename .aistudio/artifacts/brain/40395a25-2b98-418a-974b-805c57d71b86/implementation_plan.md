@@ -1,131 +1,62 @@
-# KYT Vietnam — Trang Hệ Thống Cửa Hàng & Trưng Bày Nón Chủ Lực (Apple Minimalist Style)
+# Kế hoạch Khắc phục & Kiểm thử Hệ thống Lưu trữ Đăng ký Đại lý & Tracking Đa tầng
 
-Xây dựng trang Landing Page kết hợp danh bạ tra cứu cửa hàng phân phối nón bảo hiểm KYT chính hãng theo ngôn ngữ thiết kế tối giản của Apple (Apple Store Retail Directory), sử dụng bảng màu **Trắng - Đen - Đỏ Racing** và cấu trúc dữ liệu tách biệt để dễ dàng cập nhật danh sách đại lý, logo và hình ảnh thực tế.
+## 1. Chẩn đoán Nguyên nhân Gốc rễ (Root Cause Analysis)
 
-### User Review & Critical Decisions
+Qua kiểm tra mã nguồn hiện tại (`src/lib/tracking.ts`, `firestore.rules`, `firebase-blueprint.json`), có **3 nguyên nhân kỹ thuật** khiến dữ liệu Form Đăng ký Đại lý và Bộ Tracking chưa lưu trữ bền vững:
 
-> [!IMPORTANT]
-> Dưới đây là các quyết định thiết kế đã được xác nhận từ câu trả lời của bạn, kết hợp cùng cấu trúc dữ liệu mẫu sẵn sàng để bạn thay thế tài nguyên thực tế bất cứ lúc nào:
-
-- **Bố cục tra cứu cửa hàng (Đã xác nhận)**: Thiết kế dạng **lưới thẻ tối giản kiểu Apple Store (3 cột trên Desktop)** với hình ảnh mặt tiền/không gian trưng bày, địa chỉ, giờ mở cửa, số điện thoại và nút **Chỉ đường (Google Maps)** trực tiếp.
-- **Bộ lọc địa lý thông minh (Đã xác nhận)**: Tích hợp thanh lọc **Tỉnh/Thành phố** và **Quận/Huyện** phụ thuộc tự động (khi chọn Tỉnh/Thành phố, danh sách Quận/Huyện tự động cập nhật tương ứng kèm số lượng cửa hàng).
-- **Khu vực mở đầu trang (Đã xác nhận)**: **Hero Banner tôn vinh dòng nón KYT chủ lực** (ví dụ: KYT KX-1 Race GP / TT-Course) với bố cục đối xứng sang trọng, điểm nhấn sắc Đỏ KYT Racing trên nền Trắng/Đen tương phản cao, điều hướng mượt xuống khu vực tìm cửa hàng.
-- **Cấu trúc chờ nạp tài nguyên (Mặc định khuyến nghị)**: Tách riêng toàn bộ dữ liệu cửa hàng, thông tin dòng nón Hero và đường dẫn logo/hình ảnh vào một cấu trúc dữ liệu tập trung kèm chế độ xem chi tiết từng cửa hàng (Modal chi tiết không gian & các dòng nón có sẵn tại điểm bán).
-
----
-
-### 1. Overview & Core Concept
-
-- **What It Does**: Trang đích chính thức giúp khách hàng chiêm ngưỡng dòng nón KYT chủ lực và nhanh chóng tra cứu địa chỉ các cửa hàng, đại lý phân phối KYT chính hãng theo Tỉnh/Thành phố và Quận/Huyện.
-- **Target Audience / Persona**: Người chơi xe phân khối lớn, biker yêu thích mũ bảo hiểm chuẩn đua (MotoGP) và khách hàng phổ thông muốn tìm điểm bán KYT chính hãng gần nhất để đội thử size trực tiếp.
-- **Key Value**: Mang lại trải nghiệm tra cứu đẳng cấp, rõ ràng, không rối mắt như trang *Apple Find a Store*, đồng thời tôn vinh tinh thần thể thao tốc độ của thương hiệu KYT qua sắc đỏ đặc trưng.
+1. **Form Đăng ký Đại lý (`submitDealerApplication`) chưa có kết nối Cloud / Server**:
+   - Hàm `submitDealerApplication()` trong `src/lib/tracking.ts` chỉ lưu vào `localStorage` (`kyt_vn_dealer_applications_v1`) của trình duyệt hiện tại.
+   - Chưa có bảng dữ liệu `/dealer_applications/{applicationId}` trên Cloud Firestore và chưa có API lưu trữ phía Server. Khi khách hàng điền form trên thiết bị khác, trình duyệt ẩn danh, hoặc trong iframe bị giới hạn bộ nhớ cục bộ, dữ liệu không được đồng bộ về máy của Admin.
+2. **Bộ Tracking (`trackKytEvent`) bị chặn bởi điều kiện `auth.currentUser` & `isSignedIn()`**:
+   - Sau khi chuyển quyền truy cập Admin sang tổ hợp phím `Shift + K + Y + T + 1 + 2 + 3` (`KYT123`) để tránh lỗi `auth/unauthorized-domain` của Google Sign-In trong iframe, biến `auth.currentUser` luôn là `null`.
+   - Trong `src/lib/tracking.ts`, lệnh `syncEventToFirestore()` bị bọc trong điều kiện `if (isAuthorizedAdminUser(auth.currentUser))`, và `firestore.rules` bắt buộc `isSignedIn()` cho cả thao tác ghi (`create`) lẫn đọc (`list`/`get`). Hệ quả là 100% lượt tương tác của khách và của Admin khi mở bằng phím tắt đều không được đẩy lên hay tải về từ Cloud Firestore.
+3. **Thiếu Lớp Lưu trữ Server (`server.ts`) Dự phòng**:
+   - Ứng dụng đang chạy thuần Vite SPA mà chưa có Express Backend API để lưu file vật lý (`.json` / `.csv`) trên ổ đĩa máy chủ làm nguồn đối chiếu dự phòng khi mạng hoặc trình duyệt chặn quyền lưu cục bộ.
 
 ---
 
-### 2. User Experience & Visual Design
+## 2. Kiến trúc Giải pháp: Đồng bộ Đa tầng (3-Tier Persistence)
 
-- **Key User Flows**:
-  1. **Trải nghiệm đầu trang (Hero Flagship Showcase)**: Người dùng truy cập thấy ngay thanh điều hướng tối giản và Hero Banner khổ rộng tôn vinh mẫu nón chủ lực của KYT, kèm thông số kỹ thuật tinh gọn (trọng lượng, chuẩn an toàn FIM/ECE, chất liệu Tricomposite/Carbon) và nút cuộn mượt xuống danh sách cửa hàng.
-  2. **Tra cứu & Lọc cửa hàng theo Tỉnh/Thành - Quận/Huyện**: Người dùng chọn **Tỉnh/Thành phố** (ví dụ: TP. Hồ Chí Minh, Hà Nội, Đà Nẵng...) $\rightarrow$ Hệ thống lập tức lọc danh sách thẻ cửa hàng và mở khóa bộ chọn **Quận/Huyện** tương ứng của tỉnh đó.
-  3. **Tương tác thẻ cửa hàng & Chỉ đường**: Mỗi thẻ cửa hàng hiển thị ảnh không gian, tên đại lý, khu vực, địa chỉ, trạng thái giờ hoạt động và số điện thoại. Người dùng có thể bấm **"Chỉ đường"** để mở lộ trình Google Maps hoặc bấm vào thẻ để xem **Chi tiết cửa hàng** (các dòng nón trưng bày tại điểm bán, dịch vụ đo size, thay kính, bảo hành).
+Hệ thống lưu trữ mới sẽ hoạt động đồng thời trên **3 tầng (Cloud Firestore + Server Disk API + LocalStorage)** cho cả **Hồ sơ Đăng ký Đại lý** và **Sự kiện Tracking**:
 
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: **Apple Retail Minimalism meets Motorsport Precision** — Không gian trắng thoáng đãng, lưới bố cục sắc sảo, kết hợp khối Hero đen tuyền sang trọng và điểm nhấn đỏ KYT (`#E10600`) đúng tỷ lệ.
-  - *Color Palette & Mood (Quy tắc 60-30-10)*:
-    - **60% Dominant Neutral Canvas**: Trắng tinh khiết (`#FFFFFF`) và xám bạc Apple (`#F5F5F7`) làm nền chính cho khu vực danh mục cửa hàng, giúp thông tin địa chỉ đọc cực kỳ rõ nét.
-    - **30% Structural Contrast**: Đen Obsidian (`#0A0A0A`) và Xám Than (`#1D1D1F`) cho khu vực Hero Flagship, chữ tiêu đề độ tương phản cao và chân trang.
-    - **10% High-Intent Accent**: Đỏ KYT Racing (`#E10600` / `#DC2626`) chỉ xuất hiện có chủ đích tại các điểm nhấn hành động chính (nút CTA, chỉ báo bộ lọc đang chọn, đường kẻ tiêu chuẩn đường đua).
-  - *Typography & Hierarchy*:
-    - **Display / Headings**: `Plus Jakarta Sans` (Geometric Sans hiện đại, kerning chặt `tracking-tight`, mang cảm giác công nghệ cao giống Apple Display).
-    - **Body Prose**: `DM Sans` (Rõ ràng, dễ đọc cho địa chỉ và thông tin liên hệ).
-    - **Numeric / Specs**: `JetBrains Mono` (`tabular-nums` cho số điện thoại, khung giờ hoạt động, tọa độ và thông số kỹ thuật nón).
-  - *Component Styling & Layout*:
-    - **Top Bar 3-Zone Contract**: Gồm 3 vùng chuẩn mực: Logo KYT bên trái — Các liên kết điều hướng 1 dòng ở giữa — 1 nút hành động chính ("Tìm cửa hàng") bên phải.
-    - **Zero-Pill Metadata Discipline**: Không lạm dụng các nhãn hộp màu mè gây rối mắt; thông tin phân loại cửa hàng và quận/huyện được trình bày bằng chữ tinh tế phân cách bởi dấu chấm giữa (`·`).
-    - **Store Grid Layout**: Lưới 3 cột chuẩn trên màn hình rộng (1440px container max-width 1200px, khoảng cách `gap-8`), ảnh tỷ lệ `4:3` đồng nhất chiếm 65% chiều cao thẻ.
+### Tầng 1: Cloud Firestore (`ai-studio-kytvietnamhthngc-...`)
+- **Cập nhật `firebase-blueprint.json` & `firestore.rules`**:
+  - Bổ sung thực thể `DealerApplication` và collection `/dealer_applications/{applicationId}` với kiểm duyệt schema chặt chẽ (tên cửa hàng, người liên hệ, số điện thoại, email, tỉnh/thành phố, địa chỉ, quy mô kinh doanh, ghi chú, thời gian tạo).
+  - Cho phép khách truy cập (`allow create`) gửi sự kiện hợp lệ vào `/tracking_events/{eventId}` và gửi hồ sơ đăng ký hợp lệ vào `/dealer_applications/{applicationId}` thông qua bộ kiểm tra cấu trúc dữ liệu (`isValidTrackingEvent`, `isValidDealerApplication`) mà không bị chặn bởi lỗi Google OAuth iframe.
+  - Cho phép bảng Admin (`Shift+KYT123`) truy vấn danh sách (`get`, `list`) và xóa/quản lý dữ liệu đồng bộ thời gian thực (`onSnapshot` / `getDocs`).
+  - Triển khai rules mới lên Firebase bằng công cụ `deploy_firebase`.
 
-- **Interactive Feedback & Motion**:
-  - Chuyển đổi danh sách cửa hàng mượt mà (`<= 200ms`) khi chọn Tỉnh/Thành phố hoặc Quận/Huyện.
-  - Hiệu ứng nâng nhẹ thẻ cửa hàng (`-translate-y-0.5`) và phóng nhẹ ảnh mặt tiền khi di chuột.
-  - Trạng thái trống (Empty State) lịch sự kèm nút "Đặt lại bộ lọc" nếu người dùng chọn tổ hợp khu vực chưa có đại lý.
+### Tầng 2: Express Backend Server (`server.ts` trên cổng 3000)
+- Tích hợp Express server chạy chung với Vite middleware (`tsx server.ts`), cung cấp các REST API:
+  - `GET /api/dealers` & `POST /api/dealers` & `DELETE /api/dealers`: Lưu và đọc trực tiếp danh sách hồ sơ đăng ký đại lý vào file bền vững trên máy chủ (`data/dealer-applications.json` và tự động xuất sẵn `data/dealer-applications.csv` chuẩn UTF-8 BOM).
+  - `GET /api/dealers/csv`: Endpoint tải xuống trực tiếp file `.CSV` chuẩn từ máy chủ cho Admin.
+  - `GET /api/tracking` & `POST /api/tracking` & `DELETE /api/tracking`: Lưu và đồng bộ sự kiện tracking cùng cấu hình Pixel (`GET/POST /api/tracking/config`) trên máy chủ (`data/tracking-events.json`).
+  - `POST /api/diagnostics/self-test`: Endpoint kiểm tra toàn diện khả năng đọc/ghi của Server Disk.
+
+### Tầng 3: Browser Storage (`localStorage` + In-Memory Cache)
+- Lưu tức thì ở phía trình duyệt để giao diện phản hồi 0ms, đồng thời tự động hợp nhất (deduplicate theo `id`) dữ liệu từ **Cloud Firestore + Server API + LocalStorage** khi Admin mở bảng quản trị `Shift + K + Y + T + 1 + 2 + 3`.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 3. Công cụ Tự động Kiểm tra & Báo cáo trong Admin (`Shift + K + Y + T + 1 + 2 + 3`)
 
-- **Decision 1: Bố cục Lưới Thẻ Apple Store kết hợp Ngăn Chi Tiết (Store Detail Modal)**
-  - *Chosen Approach*: Hiển thị danh sách cửa hàng dạng lưới thẻ 3 cột thoáng đãng với nút "Chỉ đường" trực tiếp, kèm cửa sổ xem nhanh chi tiết cửa hàng khi nhấp vào thẻ.
-  - *Why*: Giữ trọn vẹn thẩm mỹ sang trọng, rộng rãi của Apple Retail (`apple.com/retail/storelist`), giúp hình ảnh cửa hàng và nón KYT nổi bật hơn hẳn so với giao diện bản đồ chia đôi chật chội.
-  - *Alternatives Considered*: Nhúng bản đồ Google Maps cố định 50% màn hình — bị loại bỏ theo lựa chọn của bạn để ưu tiên sự tối giản và tập trung vào hình ảnh/địa chỉ.
-
-- **Decision 2: Bộ lọc Cascading (Tỉnh/Thành phố $\rightarrow$ Quận/Huyện) & Cấu trúc Dữ liệu Tách rời**
-  - *Chosen Approach*: Khi người dùng chọn một Tỉnh/Thành phố, dropdown/thanh chọn Quận/Huyện sẽ tự động trích xuất đúng các Quận/Huyện hiện có cửa hàng tại tỉnh đó. Toàn bộ dữ liệu đặt trong một cấu trúc mảng chuẩn hóa.
-  - *Why*: Tránh việc người dùng chọn nhầm Quận của TP.HCM khi đang xem Hà Nội, đồng thời giúp bạn sau này chỉ cần copy-paste danh sách địa chỉ thực tế và thay link ảnh/logo vào một nơi duy nhất mà không cần sửa giao diện.
+Bổ sung thanh trạng thái đồng bộ trực tiếp và nút **"Kiểm tra Hệ thống Lưu trữ (Run Self-Test)"** ngay trong `TrackingDashboardModal.tsx`:
+- Khi bấm nút, hệ thống sẽ tự động chạy quy trình kiểm thử 4 bước (và tự động dọn dẹp bản ghi test sau khi xác nhận thành công, hoặc cho phép tạo bản ghi test mẫu):
+  1. **Test Tracking Event**: Ghi 1 sự kiện tracking thử nghiệm -> Kiểm tra ghi thành công trên LocalStorage, Server API (`/api/tracking`) và Cloud Firestore (`/tracking_events`).
+  2. **Test Dealer Registration Form**: Gửi 1 hồ sơ đại lý thử nghiệm -> Kiểm tra lưu thành công trên LocalStorage, Server API (`/api/dealers`) và Cloud Firestore (`/dealer_applications`).
+  3. **Test Đọc & Đồng bộ Dữ liệu (Read-back Verification)**: Tải lại danh sách từ cả 3 nguồn và đối chiếu mã ID khớp 100%.
+  4. **Test Xuất File `.CSV` (UTF-8 BOM)**: Kiểm tra khả năng tạo chuỗi CSV và phản hồi từ `/api/dealers/csv`.
+- Hiển thị bảng kết quả trực quan (Pass/Fail từng tầng kèm độ trễ `ms` và số lượng bản ghi hiện có ở mỗi tầng).
 
 ---
 
-### 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 4. Các File Sẽ Tạo Mới & Cập Nhật
 
-- **Architecture & Component Diagram**:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        KYT STORE LOCATOR APPLICATION                    │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ Centralized Brand & Store Data Layer (Easy-Swap Config)           │  │
-│  │  • Brand Assets (Logo SVG/Image, Hero Helmet Specs & Visuals)     │  │
-│  │  • Store Directory Array (Province, District, Address, Maps URL)  │  │
-│  └─────────────────────────────────┬─────────────────────────────────┘  │
-│                                    │                                    │
-│                                    ▼                                    │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ 1. Minimalist Top Navigation Bar (3-Zone Contract)                │  │
-│  │    [KYT Wordmark/Logo] ─── [Dòng nón · Hệ thống · Tiêu chuẩn] ─── │  │
-│  │                                              [CTA: Tìm cửa hàng]  │  │
-│  └─────────────────────────────────┬─────────────────────────────────┘  │
-│                                    │                                    │
-│                                    ▼                                    │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ 2. Flagship Helmet Hero Banner (Black/White/Red Contrast)         │  │
-│  │    • Split/Editorial Showcase of Flagship KYT Helmet              │  │
-│  │    • Quick Helmet Switcher (KX-1 Race GP / TT-Course / NZ-Race)   │  │
-│  │    • Technical Specs Bar (FIM Homologated · Carbon · Aerodynamic) │  │
-│  └─────────────────────────────────┬─────────────────────────────────┘  │
-│                                    │                                    │
-│                                    ▼                                    │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ 3. Apple-Style Store Locator Engine                               │  │
-│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
-│  │  │ Cascading Filter Bar                                        │  │  │
-│  │  │ [Chọn Tỉnh/Thành phố ▼] ──► [Chọn Quận/Huyện ▼] ── [Đặt lại]│  │  │
-│  │  └──────────────────────────────┬──────────────────────────────┘  │  │
-│  │                                 ▼                                 │  │
-│  │  ┌───────────────────┐ ┌───────────────────┐ ┌─────────────────┐  │  │
-│  │  │ Store Card 01     │ │ Store Card 02     │ │ Store Card 03   │  │  │
-│  │  │ • 4:3 Store Image │ │ • 4:3 Store Image │ │ • 4:3 Store Img │  │  │
-│  │  │ • District · Tier │ │ • District · Tier │ │ • District·Tier │  │  │
-│  │  │ • Address & Hours │ │ • Address & Hours │ │ • Address&Hours │  │  │
-│  │  │ [Chỉ đường] [Xem] │ │ [Chỉ đường] [Xem] │ │ [Chỉ đường][Xem]│  │  │
-│  │  └─────────┬─────────┘ └─────────┬─────────┘ └────────┬────────┘  │  │
-│  └────────────┼─────────────────────┼────────────────────┼───────────┘  │
-│               └─────────────────────┼────────────────────┘              │
-│                                     ▼                                   │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │ 4. Interactive Store Detail Modal & Asset Import Guide            │  │
-│  │    • Full Store Details, Available Helmet Lines, Copy Address     │  │
-│  │    • Direct Google Maps Directions & Phone Call Action            │  │
-│  └───────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Data Model & State**:
-  - **Store Entity (`StoreLocation`)**: `id`, `name`, `tier` (Flagship Store / Đại lý Ủy quyền), `province` (Tỉnh/Thành phố), `district` (Quận/Huyện), `address` (Địa chỉ chi tiết), `phone` (Số điện thoại), `hours` (Giờ mở cửa), `image` (Ảnh cửa hàng), `googleMapsUrl` (Link chỉ đường), `availableLines` (Các dòng nón đang trưng bày).
-  - **Flagship Helmet Entity (`HelmetShowcase`)**: `id`, `name`, `tagline`, `category`, `weight`, `certification`, `shellMaterial`, `description`, `image`, `accentLabel`.
-
-- **Interactive Component & State Mapping**:
-  - `selectedProvince`: Khi thay đổi, tự động đặt `selectedDistrict = 'ALL'` và tính toán lại danh sách `availableDistricts` chỉ gồm các Quận/Huyện thuộc tỉnh đã chọn.
-  - `selectedDistrict`: Lọc danh sách cửa hàng chính xác theo Quận/Huyện trong Tỉnh/Thành phố đang chọn.
-  - `activeHelmetIndex`: Cho phép người dùng chuyển đổi xem nhanh giữa 3 mẫu nón chủ lực của KYT ngay trên Hero Banner.
-  - `selectedStore`: Mở hộp thoại xem chi tiết không gian cửa hàng, sao chép địa chỉ vào bộ nhớ tạm (kèm thông báo xác nhận "Đã sao chép địa chỉ") hoặc mở Google Maps.
+- `firebase-blueprint.json` & `firestore.rules`: Thêm schema `DealerApplication` (`/dealer_applications/{applicationId}`) và cập nhật quy tắc bảo mật cho `/tracking_events`, `/tracking_configs`, `/dealer_applications`.
+- `server.ts` & `package.json`: Khởi tạo Express server tích hợp Vite, cung cấp API lưu trữ bền vững `/api/dealers`, `/api/tracking`, `/api/diagnostics/self-test`.
+- `src/lib/tracking.ts`:
+  - Nâng cấp `submitDealerApplication()`, `getDealerApplications()`, `clearDealerApplications()` để đồng bộ cả 3 tầng (Firestore + Server API + LocalStorage).
+  - Nâng cấp `trackKytEvent()`, `getTrackedEvents()`, `clearTrackedEvents()`, `saveTrackingConfig()` để đồng bộ 3 tầng không phụ thuộc `auth.currentUser`.
+  - Thêm hàm `runStorageSelfTest()` trả về báo cáo chi tiết từng tầng lưu trữ.
+- `src/components/DealerRegistrationSection.tsx`: Hiển thị trạng thái xác nhận lưu thành công đa tầng sau khi khách bấm gửi form.
+- `src/components/TrackingDashboardModal.tsx`: Thêm bảng trạng thái kết nối 3 tầng (Cloud Firestore / Server API / LocalStorage) và nút chạy **Kiểm tra Hệ thống Lưu trữ (Self-Test)** trực tiếp trong giao diện Admin.
