@@ -38,6 +38,7 @@ import {
   injectExternalTrackingPixels,
   isSecretAdminUnlocked,
   unlockSecretAdmin,
+  purgeCurrentAdminSessionEvents,
 } from './lib/tracking';
 import {
   auth,
@@ -82,7 +83,12 @@ export default function App() {
   // Track authenticated admin status & Shift + K + Y + T + 1 + 2 + 3 secret key combination
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setAdminUser(isAuthorizedAdminUser(user) ? user : null);
+      if (isAuthorizedAdminUser(user)) {
+        setAdminUser(user);
+        purgeCurrentAdminSessionEvents();
+      } else {
+        setAdminUser(null);
+      }
     });
 
     const syncSecretUnlock = () => {

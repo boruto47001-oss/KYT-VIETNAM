@@ -286,7 +286,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     };
   }, [isOpen]);
 
-  // Aggregated Analytics Metrics
+  // Aggregated 30-Day (1 Month) Analytics Metrics
   const stats = useMemo(() => {
     let pageViews = 0;
     let mapDirections = 0;
@@ -295,17 +295,51 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
     let shopeeClicks = 0;
     let tiktokClicks = 0;
 
+    const uniqueSessions = new Set<string>();
     const storeRanks = new Map<string, { name: string; province: string; count: number }>();
     const helmetRanks = new Map<string, { label: string; series: string; count: number }>();
     const provinceRanks = new Map<string, number>();
+    const dailyMap = new Map<
+      string,
+      {
+        dateKey: string;
+        sessions: Set<string>;
+        pageViews: number;
+        totalEvents: number;
+        storeClicks: number;
+        ecommerceClicks: number;
+      }
+    >();
 
     for (const evt of allEvents) {
+      if (evt.sessionId) {
+        uniqueSessions.add(evt.sessionId);
+      }
+
+      const d = new Date(evt.timestampIso);
+      const dateKey = Number.isNaN(d.getTime())
+        ? new Date().toISOString().slice(0, 10)
+        : d.toISOString().slice(0, 10);
+
+      const dayEntry = dailyMap.get(dateKey) || {
+        dateKey,
+        sessions: new Set<string>(),
+        pageViews: 0,
+        totalEvents: 0,
+        storeClicks: 0,
+        ecommerceClicks: 0,
+      };
+      dayEntry.totalEvents += 1;
+      if (evt.sessionId) dayEntry.sessions.add(evt.sessionId);
+
       if (evt.eventType === 'page_view') {
         pageViews++;
+        dayEntry.pageViews += 1;
       } else if (
         evt.eventType === 'store_directions_click' ||
         evt.eventType === 'store_detail_open'
       ) {
+        dayEntry.storeClicks += 1;
         if (evt.eventType === 'store_directions_click') mapDirections++;
         const existing = storeRanks.get(evt.targetId) || {
           name: evt.targetLabel,
@@ -316,6 +350,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
         storeRanks.set(evt.targetId, existing);
       } else if (evt.eventType === 'ecommerce_click') {
         ecommerceClicks++;
+        dayEntry.ecommerceClicks += 1;
         if (evt.targetId === 'shopee') shopeeClicks++;
         if (evt.targetId === 'tiktok') tiktokClicks++;
       } else if (
@@ -334,6 +369,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
       } else if (evt.eventType === 'province_filter' && evt.targetId !== 'ALL') {
         provinceRanks.set(evt.targetLabel, (provinceRanks.get(evt.targetLabel) || 0) + 1);
       }
+
+      dailyMap.set(dateKey, dayEntry);
     }
 
     const topStores = Array.from(storeRanks.values())
@@ -349,7 +386,24 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
       .sort((a, b) => b.count - a.count)
       .slice(0, 6);
 
+    const dailyHistory = Array.from(dailyMap.values())
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+      .slice(0, 30)
+      .map((item) => ({
+        dateKey: item.dateKey,
+        uniqueVisitors: item.sessions.size,
+        pageViews: item.pageViews,
+        totalEvents: item.totalEvents,
+        storeClicks: item.storeClicks,
+        ecommerceClicks: item.ecommerceClicks,
+      }));
+
+    const now = Date.now();
+    const start30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN');
+    const endNow = new Date(now).toLocaleDateString('vi-VN');
+
     return {
+      uniqueVisitors: uniqueSessions.size,
       pageViews,
       mapDirections,
       ecommerceClicks,
@@ -359,6 +413,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
       topStores,
       topHelmets,
       topProvinces,
+      dailyHistory,
+      periodLabel: `${start30d} – ${endNow}`,
     };
   }, [allEvents]);
 
@@ -1171,26 +1227,53 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
             </div>
           )}
 
-          {/* TAB 1: ANALYTICS OVERVIEW */}
+          {/* TAB 1: ANALYTICS OVERVIEW (30-DAY ROLLING RETENTION) */}
           {activeTab === 'overview' && (
             <>
+              {/* 30-Day Retention & Admin Visit Exclusion Banner */}
+              <div className="p-4 rounded-2xl bg-[#141419] border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center flex-wrap gap-2 text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>
+                      {isEn
+                        ? `30-DAY (1 MONTH) ROLLING RETENTION · ${stats.periodLabel}`
+                        : `CHU KỲ LƯU TRỮ & TỔNG HỢP 1 THÁNG (30 NGÀY LIÊN TỤC: ${stats.periodLabel})`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-300">
+                    {isEn
+                      ? 'History is continuously aggregated across a 30-day rolling window (never resets daily). Admin visits and Admin mode interactions are automatically excluded from visitor counts.'
+                      : 'Dữ liệu được cộng dồn liên tục xuyên suốt 30 ngày (không bị reset mỗi ngày) để phục vụ tổng hợp tháng. Mọi lượt truy cập của Admin đều tự động được loại trừ, không tính thành lượt truy cập mới.'}
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-mono text-emerald-300 font-bold shrink-0">
+                  {isEn ? 'ADMIN VISITS EXCLUDED' : 'ĐÃ LOẠI TRỪ LƯỢT ADMIN'}
+                </span>
+              </div>
+
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>{isEn ? 'Total Events / Views' : 'Tổng lượt tương tác'}</span>
+                    <span>{isEn ? '30-Day Visits / Events' : 'Lượt truy cập (30 ngày)'}</span>
                     <Eye className="w-4 h-4 text-neutral-400" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-white">
-                    {allEvents.length}
+                    {stats.uniqueVisitors}{' '}
+                    <span className="text-sm font-normal text-neutral-400">
+                      {isEn ? 'visitors' : 'khách'}
+                    </span>
                   </p>
                   <p className="text-[11px] text-neutral-500">
-                    {isEn ? `${stats.pageViews} page loads` : `${stats.pageViews} lượt tải trang`}
+                    {isEn
+                      ? `${stats.pageViews} page views · ${allEvents.length} total actions`
+                      : `${stats.pageViews} lượt tải trang · ${allEvents.length} tương tác`}
                   </p>
                 </div>
 
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>{isEn ? 'Google Maps Clicks' : 'Bấm Chỉ đường Đại lý'}</span>
+                    <span>{isEn ? 'Google Maps Clicks (30d)' : 'Bấm Chỉ đường (30 ngày)'}</span>
                     <Navigation className="w-4 h-4 text-[#FF1E1A]" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-[#FF1E1A]">
@@ -1203,7 +1286,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>{isEn ? 'Shopee & TikTok Clicks' : 'Click Shopee & TikTok'}</span>
+                    <span>{isEn ? 'Shopee & TikTok (30d)' : 'Shopee & TikTok (30 ngày)'}</span>
                     <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-[#EE4D2D]">
@@ -1216,14 +1299,14 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
 
                 <div className="p-4 sm:p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>{isEn ? 'Helmet & Size Checks' : 'Xem nón & Đo size'}</span>
+                    <span>{isEn ? 'Helmet & Size Checks (30d)' : 'Xem nón & Đo size (30 ngày)'}</span>
                     <Sparkles className="w-4 h-4 text-amber-400" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-amber-400">
                     {stats.helmetViews}
                   </p>
                   <p className="text-[11px] text-neutral-500">
-                    3D Coverflow + Bảng đo size 1:1
+                    3D Coverflow + Bảng quy đổi size nón
                   </p>
                 </div>
               </div>
@@ -1236,8 +1319,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                       <MapPin className="w-4 h-4 text-[#E10600]" />
                       <span>
                         {isEn
-                          ? 'Top Dealers by Customer Clicks'
-                          : 'Top Đại lý được khách bấm nhiều nhất'}
+                          ? 'Top Dealers by Customer Clicks (30 Days)'
+                          : 'Top Đại lý được khách bấm nhiều nhất (30 ngày)'}
                       </span>
                     </h3>
                     {allEvents.length > 0 && (
@@ -1246,7 +1329,7 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                         onClick={handleClearEvents}
                         className="text-[11px] font-mono text-neutral-400 hover:text-red-400 cursor-pointer"
                       >
-                        {isEn ? 'Reset log' : 'Xóa bộ đếm'}
+                        {isEn ? 'Clear 30d log' : 'Xóa lịch sử 30 ngày'}
                       </button>
                     )}
                   </div>
@@ -1292,8 +1375,8 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                   <div className="space-y-3">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                       {isEn
-                        ? 'Most Viewed Helmet Models & Size Checks'
-                        : 'Dòng nón & Bảng size được xem nhiều nhất'}
+                        ? 'Most Viewed Helmet Models & Size Checks (30 Days)'
+                        : 'Dòng nón & Bảng size được xem nhiều nhất (30 ngày)'}
                     </h3>
                     {stats.topHelmets.length > 0 ? (
                       <div className="space-y-2.5">
@@ -1323,29 +1406,84 @@ export const TrackingDashboardModal: React.FC<TrackingDashboardModalProps> = ({
                 </div>
               </div>
 
-              {/* Real-Time Event Log Stream */}
+              {/* 30-Day Daily Aggregation Table */}
+              {stats.dailyHistory.length > 0 && (
+                <div className="p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                      {isEn
+                        ? 'Daily Traffic Summary (30-Day Rolling History)'
+                        : 'Bảng Tổng hợp Truy cập Theo Ngày (Lưu trữ 30 ngày)'}
+                    </h3>
+                    <span className="text-[11px] font-mono text-emerald-400">
+                      {stats.dailyHistory.length} {isEn ? 'active days' : 'ngày có dữ liệu'}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-48">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 font-mono text-[11px] uppercase text-neutral-400">
+                          <th className="py-2 pr-4">{isEn ? 'Date' : 'Ngày'}</th>
+                          <th className="py-2 px-3">{isEn ? 'Unique Visitors' : 'Khách truy cập'}</th>
+                          <th className="py-2 px-3">{isEn ? 'Page Views' : 'Lượt tải trang'}</th>
+                          <th className="py-2 px-3">{isEn ? 'Dealer Clicks' : 'Click Đại lý'}</th>
+                          <th className="py-2 px-3">{isEn ? 'E-Commerce' : 'Click TMĐT'}</th>
+                          <th className="py-2 pl-3 text-right">{isEn ? 'Total Events' : 'Tổng tương tác'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.06] font-mono">
+                        {stats.dailyHistory.map((day) => (
+                          <tr key={day.dateKey} className="hover:bg-white/[0.03]">
+                            <td className="py-2 pr-4 font-bold text-white">{day.dateKey}</td>
+                            <td className="py-2 px-3 text-emerald-400 font-bold">
+                              {day.uniqueVisitors}
+                            </td>
+                            <td className="py-2 px-3 text-neutral-300">{day.pageViews}</td>
+                            <td className="py-2 px-3 text-[#FF1E1A]">{day.storeClicks}</td>
+                            <td className="py-2 px-3 text-[#EE4D2D]">{day.ecommerceClicks}</td>
+                            <td className="py-2 pl-3 text-right text-white font-bold">
+                              {day.totalEvents}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 30-Day Event Log Stream (Full Date + Time) */}
               <div className="p-5 rounded-2xl bg-[#141419] border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                    {isEn ? 'Real-Time Event Stream' : 'Nhật ký Tương tác Thời gian thực'}
+                    {isEn
+                      ? '30-Day Interaction Log Stream'
+                      : 'Nhật ký Tương tác Chi tiết (Chu kỳ 30 ngày)'}
                   </h3>
                   <span className="text-[11px] font-mono text-neutral-400">
                     {isEn
-                      ? `Showing latest ${Math.min(allEvents.length, 25)} events`
-                      : `Hiển thị ${Math.min(allEvents.length, 25)} sự kiện gần nhất`}
+                      ? `Showing latest ${Math.min(allEvents.length, 100)} of ${allEvents.length} events (30d)`
+                      : `Hiển thị ${Math.min(allEvents.length, 100)} / ${allEvents.length} sự kiện trong 30 ngày`}
                   </span>
                 </div>
 
                 <div className="max-h-56 overflow-y-auto divide-y divide-white/[0.06]">
-                  {allEvents.slice(0, 25).map((evt) => {
+                  {allEvents.slice(0, 100).map((evt) => {
                     const meta = EVENT_TYPE_LABELS[evt.eventType] || {
                       vie: evt.eventType,
                       eng: evt.eventType,
                       color: 'text-neutral-300',
                     };
-                    const timeStr = new Date(evt.timestampIso).toLocaleTimeString(
+                    const timeStr = new Date(evt.timestampIso).toLocaleString(
                       isEn ? 'en-US' : 'vi-VN',
-                      { hour: '2-digit', minute: '2-digit', second: '2-digit' }
+                      {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      }
                     );
                     return (
                       <div

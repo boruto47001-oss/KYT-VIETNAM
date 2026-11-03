@@ -13,7 +13,9 @@ const DEALERS_CSV_PATH = path.join(DATA_DIR, 'dealer-applications.csv');
 const TRACKING_JSON_PATH = path.join(DATA_DIR, 'tracking-events.json');
 const CONFIG_JSON_PATH = path.join(DATA_DIR, 'tracking-config.json');
 
-const MAX_SERVER_EVENTS = 3000;
+// 30-Day (1 Month) Rolling Retention Window for Tracking History
+const RETENTION_30_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_SERVER_EVENTS = 50000;
 
 export interface ServerDealerRecord {
   id: string;
@@ -53,7 +55,7 @@ export interface ServerTrackingConfig {
   gtmContainerId: string;
   metaPixelId: string;
   tiktokPixelId: string;
-  enableAutoTracking: boolean;
+  enableAutoTracking: 'true' | 'false' | boolean;
 }
 
 const DEFAULT_CONFIG: ServerTrackingConfig = {
@@ -61,7 +63,7 @@ const DEFAULT_CONFIG: ServerTrackingConfig = {
   gtmContainerId: '',
   metaPixelId: '',
   tiktokPixelId: '',
-  enableAutoTracking: true,
+  enableAutoTracking: 'true',
 };
 
 function ensureDataDir(): void {
@@ -144,6 +146,11 @@ function writeDealersToDisk(records: ServerDealerRecord[]): void {
   }
 }
 
+function filterEventsWithin30Days(events: ServerTrackingEvent[]): ServerTrackingEvent[] {
+  const cutoff = Date.now() - RETENTION_30_DAYS_MS;
+  return events.filter((ev) => ev.timestamp >= cutoff);
+}
+
 function readTrackingEventsFromDisk(): ServerTrackingEvent[] {
   ensureDataDir();
   try {
@@ -153,9 +160,10 @@ function readTrackingEventsFromDisk(): ServerTrackingEvent[] {
     const raw = fs.readFileSync(TRACKING_JSON_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const normalized = parsed
       .map((item) => normalizeTrackingEvent(item))
       .filter((ev): ev is ServerTrackingEvent => ev !== null);
+    return filterEventsWithin30Days(normalized);
   } catch (err) {
     console.error('[Server Storage] Failed to read tracking-events.json:', err);
     return [];
@@ -165,7 +173,8 @@ function readTrackingEventsFromDisk(): ServerTrackingEvent[] {
 function writeTrackingEventsToDisk(events: ServerTrackingEvent[]): void {
   ensureDataDir();
   try {
-    const sorted = [...events]
+    const within30Days = filterEventsWithin30Days(events);
+    const sorted = [...within30Days]
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, MAX_SERVER_EVENTS);
     fs.writeFileSync(TRACKING_JSON_PATH, JSON.stringify(sorted, null, 2), 'utf-8');
@@ -298,7 +307,7 @@ async function startServer() {
   }
 
   const app = express();
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '5mb' }));
 
   app.get('/api/health', (_req, res) => {
     const dealers = readDealersFromDisk();
@@ -307,6 +316,7 @@ async function startServer() {
     res.json({
       ok: true,
       timestamp: Date.now(),
+      retentionDays: 30,
       storageDir: DATA_DIR,
       csvReady: csvExists,
       counts: {
@@ -402,6 +412,7 @@ async function startServer() {
     const config = readConfigFromDisk();
     res.json({
       ok: true,
+      retentionDays: 30,
       events,
       total: events.length,
       config,
@@ -419,6 +430,7 @@ async function startServer() {
       ? req.body.events
       : [req.body];
 
+    const cutoff = Date.now() - RETENTION_30_DAYS_MS;
     let savedEvent: ServerTrackingEvent | null = null;
     let addedCount = 0;
 
@@ -426,6 +438,7 @@ async function startServer() {
       if (!rawItem || typeof rawItem !== 'object') continue;
       const normalized = normalizeTrackingEvent(rawItem as Partial<ServerTrackingEvent>);
       if (!normalized) continue;
+      if (normalized.timestamp < cutoff) continue;
       if (!byId.has(normalized.eventId)) {
         addedCount += 1;
       }
@@ -449,6 +462,9 @@ async function startServer() {
 
   app.delete('/api/tracking', (req, res) => {
     const targetId = typeof req.query.id === 'string' ? req.query.id.trim() : '';
+    const targetSessionId =
+      typeof req.query.sessionId === 'string' ? req.query.sessionId.trim() : '';
+
     if (targetId) {
       const existing = readTrackingEventsFromDisk();
       const filtered = existing.filter((ev) => ev.id !== targetId && ev.eventId !== targetId);
@@ -456,6 +472,20 @@ async function startServer() {
       res.json({ ok: true, deletedId: targetId, total: filtered.length });
       return;
     }
+
+    if (targetSessionId) {
+      const existing = readTrackingEventsFromDisk();
+      const filtered = existing.filter((ev) => ev.sessionId !== targetSessionId);
+      writeTrackingEventsToDisk(filtered);
+      res.json({
+        ok: true,
+        purgedSessionId: targetSessionId,
+        removedCount: existing.length - filtered.length,
+        total: filtered.length,
+      });
+      return;
+    }
+
     writeTrackingEventsToDisk([]);
     res.json({ ok: true, clearedAll: true, total: 0 });
   });
@@ -478,9 +508,9 @@ async function startServer() {
         .trim()
         .slice(0, 64),
       enableAutoTracking:
-        typeof req.body?.enableAutoTracking === 'boolean'
-          ? req.body.enableAutoTracking
-          : current.enableAutoTracking,
+        req.body?.enableAutoTracking === 'false' || req.body?.enableAutoTracking === false
+          ? 'false'
+          : 'true',
     };
     writeConfigToDisk(nextConfig);
     res.json({ ok: true, config: nextConfig });

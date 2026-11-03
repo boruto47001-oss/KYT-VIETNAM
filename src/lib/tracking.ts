@@ -117,13 +117,15 @@ export interface StorageSelfTestReport {
 }
 
 export const MAX_PIXEL_ID_LENGTH = 64;
+export const TRACKING_RETENTION_DAYS = 30;
+export const RETENTION_30_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const STORAGE_EVENTS_KEY = 'kyt_vn_tracking_events_v1';
 const STORAGE_CONFIG_KEY = 'kyt_vn_tracking_config_v1';
-const STORAGE_SESSION_KEY = 'kyt_vn_session_id_v1';
+const STORAGE_SESSION_KEY = 'kyt_vn_visitor_session_30d_v1';
 const STORAGE_DEALER_APPLICATIONS_KEY = 'kyt_vn_dealer_applications_v1';
 const STORAGE_ADMIN_UNLOCK_KEY = 'kyt_vn_secret_admin_unlocked_v1';
-const MAX_STORED_EVENTS = 2500;
+const MAX_STORED_EVENTS = 15000;
 const DRIVE_FOLDER_NAME = 'KYT Vietnam Analytics & Dealer Data';
 
 const DEFAULT_CONFIG: TrackingPixelConfig = {
@@ -245,24 +247,52 @@ function sanitizeFirestoreId(raw: string): string {
 
 export function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return 'ssr_session';
+  const now = Date.now();
   try {
-    let sid = sessionStorage.getItem(STORAGE_SESSION_KEY);
-    if (!sid) {
-      sid = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-      sessionStorage.setItem(STORAGE_SESSION_KEY, sid);
+    const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          typeof parsed.id === 'string' &&
+          parsed.id.length > 0 &&
+          typeof parsed.expiresAt === 'number' &&
+          parsed.expiresAt > now
+        ) {
+          memorySessionId = sanitizeFirestoreId(parsed.id);
+          return memorySessionId;
+        }
+      } catch {
+        // Legacy plain string session ID: upgrade to 30-day object
+        if (raw.startsWith('sess_')) {
+          memorySessionId = sanitizeFirestoreId(raw);
+          localStorage.setItem(
+            STORAGE_SESSION_KEY,
+            JSON.stringify({ id: memorySessionId, expiresAt: now + RETENTION_30_DAYS_MS })
+          );
+          return memorySessionId;
+        }
+      }
     }
-    memorySessionId = sanitizeFirestoreId(sid);
+
+    const newSid = `sess_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    memorySessionId = sanitizeFirestoreId(newSid);
+    localStorage.setItem(
+      STORAGE_SESSION_KEY,
+      JSON.stringify({ id: memorySessionId, expiresAt: now + RETENTION_30_DAYS_MS })
+    );
     return memorySessionId;
   } catch {
     if (!memorySessionId) {
-      memorySessionId = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      memorySessionId = `sess_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     }
     return memorySessionId;
   }
 }
 
 // ============================================================================
-// SECRET ADMIN UNLOCK (SHIFT + K + Y + T + 1 + 2 + 3)
+// SECRET ADMIN UNLOCK (SHIFT + K + Y + T + 1 + 2 + 3) & ADMIN VISIT EXCLUSION
 // ============================================================================
 
 export function isSecretAdminUnlocked(): boolean {
@@ -270,8 +300,8 @@ export function isSecretAdminUnlocked(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const val =
-      sessionStorage.getItem(STORAGE_ADMIN_UNLOCK_KEY) ||
-      localStorage.getItem(STORAGE_ADMIN_UNLOCK_KEY);
+      localStorage.getItem(STORAGE_ADMIN_UNLOCK_KEY) ||
+      sessionStorage.getItem(STORAGE_ADMIN_UNLOCK_KEY);
     if (val === 'true') {
       memoryAdminUnlocked = true;
       return true;
@@ -280,6 +310,49 @@ export function isSecretAdminUnlocked(): boolean {
   } catch {
     return memoryAdminUnlocked;
   }
+}
+
+export function isAdminAccessActive(): boolean {
+  if (isSecretAdminUnlocked()) return true;
+  if (isAuthorizedAdminUser(auth.currentUser)) return true;
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    if (hash === '#kyt-admin' || search.includes('admin=kyt')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Removes any visitor tracking events (like initial page_view before pressing Shift+KYT123)
+ * recorded by the Admin's current browser session so Admin visits are never counted.
+ */
+export function purgeCurrentAdminSessionEvents(): void {
+  if (typeof window === 'undefined') return;
+  const adminSid = getOrCreateSessionId();
+  if (!adminSid) return;
+
+  const existing = loadLocalEvents();
+  const filtered = existing.filter((ev) => ev.sessionId !== adminSid);
+  if (filtered.length !== existing.length) {
+    saveTrackingEventsLocal(filtered);
+  }
+
+  fetch(`/api/tracking?sessionId=${encodeURIComponent(adminSid)}`, {
+    method: 'DELETE',
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data && typeof data.total === 'number') {
+        serverEventCount = data.total;
+      }
+      window.dispatchEvent(new CustomEvent('kyt-tracking-updated'));
+    })
+    .catch(() => {});
+
+  window.dispatchEvent(new CustomEvent('kyt-tracking-updated'));
 }
 
 export function unlockSecretAdmin(): void {
@@ -291,6 +364,8 @@ export function unlockSecretAdmin(): void {
   } catch {
     // Keep in memoryAdminUnlocked
   }
+  // Automatically scrub any page_view or events generated by this Admin session before unlocking
+  purgeCurrentAdminSessionEvents();
   window.dispatchEvent(new CustomEvent('kyt-admin-auth-changed'));
 }
 
@@ -402,12 +477,13 @@ function normalizeClientDealer(raw: Partial<DealerApplicationRecord>): DealerApp
 }
 
 function mergeEventsById(lists: Partial<TrackingEventRecord>[][]): TrackingEventRecord[] {
+  const cutoff = Date.now() - RETENTION_30_DAYS_MS;
   const byId = new Map<string, TrackingEventRecord>();
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
     for (const item of list) {
       const norm = normalizeClientEvent(item);
-      if (norm) {
+      if (norm && norm.timestamp >= cutoff) {
         byId.set(norm.eventId, norm);
       }
     }
@@ -868,6 +944,11 @@ export function trackKytEvent(
     category = options?.category || 'general';
     lang = options?.lang || 'VIE';
     meta = options?.meta;
+  }
+
+  // Do NOT count Admin visits or Admin browsing interactions as new visitor traffic
+  if (isAdminAccessActive() && eventType !== 'dealer_registration') {
+    return null;
   }
 
   const now = Date.now();
